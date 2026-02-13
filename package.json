@@ -1,0 +1,27 @@
+{
+  "name": "dev-toolkit",
+  "version": "1.0.0",
+  "description": "開發工具集合專案",
+  "type": "module",
+  "main": "cli.js",
+  "bin": {
+    "devtool": "./cli.js"
+  },
+  "scripts": {
+    "start": "node cli.js",
+    "check-domains": "node node/check-domain/check-domains.js",
+    "proxy": "node node/proxy-server/https-to-http-proxy.js"
+  },
+  "keywords": [
+    "dev-tools",
+    "cli",
+    "domain-checker",
+    "proxy"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^9.2.12",
+    "chalk": "^5.3.0"
+  }
+}

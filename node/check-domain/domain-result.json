@@ -1,0 +1,17 @@
+[
+  {
+    "domain": "google.com",
+    "status": "UNKNOWN",
+    "message": "No expiry date found"
+  },
+  {
+    "domain": "example.com",
+    "status": "UNKNOWN",
+    "message": "No expiry date found"
+  },
+  {
+    "domain": "expired-domain-test.com",
+    "status": "UNKNOWN",
+    "message": "No expiry date found"
+  }
+]

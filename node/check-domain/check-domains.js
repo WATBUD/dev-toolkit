@@ -1,8 +1,13 @@
 import fs from "fs";
 import whois from "whois-json";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
-const FILE_PATH = "./domains.json";
-const OUTPUT_PATH = "./domain-result.json";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const FILE_PATH = join(__dirname, "./domains.json");
+const OUTPUT_PATH = join(__dirname, "./domain-result.json");
 
 async function checkDomain(domain) {
   try {

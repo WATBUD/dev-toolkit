@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A simple Node.js automation script to check domain expiration dates using WHOIS.",
   "main": "check-domains.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

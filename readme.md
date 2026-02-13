@@ -1,275 +1,79 @@
-很好 😎
-既然你要做 **工具集合 monorepo**，那這個 README 會是「母倉等級」版本。
+# Dev Toolkit 🛠️
 
-下面這份是：
-
-> ✅ 偏工程
-> ✅ 偏內部基礎建設
-> ✅ 可長期擴充
-> ✅ 有架構感
-
-可以直接當 `dev-toolkit` 根 README 使用。
+這是一個專門為開發流程設計的工具集合 (Monorepo)，包含域名檢查、HTTPS 代理伺服器等實用功能。
 
 ---
 
-```md
-# Dev Toolkit
+## 🚀 快速啟動 (互動式選單)
 
-A centralized monorepo containing internal development tools, infrastructure utilities, and network-related helpers.
+我們提供了一個熱鍵與跨平台選單，讓你不需要記下各種繁瑣的指令：
 
----
+1. **安裝依賴** (第一次使用時):
+   ```bash
+   npm install
+   ```
+2. **啟動互動式 CLI**:
+   ```bash
+   npm start
+   ```
 
-## 🎯 Purpose
-
-Dev Toolkit is a collection of reusable engineering tools designed to:
-
-- Standardize internal utilities
-- Improve reliability across projects
-- Centralize infrastructure helpers
-- Provide network and connectivity safeguards
-- Enable automation and operational tooling
-
-This repository acts as a foundation layer for web, mobile, and backend systems.
+或是直接使用 **VSCode 快捷鍵**: `Cmd+1` (需按照下方設定)
 
 ---
 
-## 📦 Architecture
+## 📦 工具列表
 
-This project follows a modular monorepo structure.
-```
+### 1. 🔍 Check Domains (域名檢查)
 
-dev-toolkit/
-├── packages/
-│ ├── network/
-│ ├── proxy/
-│ ├── domain-checker/
-│ ├── healthcheck/
-│ ├── fail-safe/
-│ ├── logger/
-│ └── utils/
-├── package.json
-├── pnpm-workspace.yaml / yarn-workspace config
-└── README.md
+- **路徑**: `node/check-domain/`
+- **功能**: 讀取 `domains.json` 並透過 WHOIS 檢查域名剩餘天數。
+- **輸出**: 生成 `domain-result.json` 並在終端機顯示表格。
 
-````
+### 2. 🔄 HTTPS Proxy (HTTPS 代理)
 
-Each package is:
-
-- Independently maintainable
-- Publishable (optional)
-- Version-controlled under the same workspace
+- **路徑**: `node/proxy-server/`
+- **功能**: 使用 mkcert 證書將本地 HTTPS 請求轉發至指定 HTTP 端口。
+- **範例**: `https://app.example.com` -> `http://localhost:3002`
 
 ---
 
-## 🧩 Core Modules (Planned / Example)
+## ⌨️ VSCode 整合
 
-### Network
-- Connectivity detection
-- VPN / Proxy awareness
-- Reachability validation
+本專案已深度整合 VSCode Tasks，建議設定快捷鍵以獲得最佳體驗。
 
-### Proxy
-- Proxy detection helpers
-- IP validation
-- Risk-based filtering utilities
+### 快捷鍵設定建議
 
-### Domain Checker
-- WHOIS expiry checker
-- DNS validation
-- Automated domain health reports
+1. 按 `Cmd+Shift+P` 開啟命令面板。
+2. 輸入 `Preferences: Open Keyboard Shortcuts (JSON)`。
+3. 貼上以下設定 (參考 `.vscode/keybindings.json`):
 
-### Healthcheck
-- API availability monitor
-- Server reachability test
-- Timeout & retry utilities
+```json
+[
+  {
+    "key": "cmd+1",
+    "command": "workbench.action.tasks.runTask",
+    "args": "Dev Toolkit CLI"
+  }
+]
+```
 
-### Fail-safe
-- Offline fallback logic
-- Circuit breaker helpers
-- Safe network request wrapper
+### 可用任務 (Tasks)
 
-### Logger
-- Structured logging
-- Error normalization
-- Environment-based logging levels
+- `Dev Toolkit CLI`: 啟動互動式選單 (推薦)
+- `check-domains`: 直接執行域名檢查
 
 ---
 
-## 🛠 Tech Stack
+## 🛠️ 開發與擴充
 
-- Node.js 18+
-- TypeScript (recommended)
-- Workspace (pnpm / yarn / npm workspaces)
+如果你想新增工具：
 
----
-
-## VSCode 任務快捷鍵
-
-本專案已設定 VSCode Tasks，可快速執行常用指令。
-
-### 可用任務
-
-- **check-domains** - 執行域名到期檢查
-
-### 執行方式
-
-#### 方法 1：命令面板
-1. 按 `Cmd+Shift+P`
-2. 輸入 `Tasks: Run Task`
-3. 選擇 `check-domains`
-
-#### 方法 2：設定鍵盤快捷鍵（建議）
-1. 按 `Cmd+Shift+P` 開啟命令面板
-2. 輸入 `Preferences: Open Keyboard Shortcuts (JSON)`
-3. 參考 `.vscode/keybindings.json` 中的建議設定
-4. 複製到您的使用者 keybindings.json 中
-
-建議快捷鍵：`Cmd+6` 執行 check-domains
-
----
-
-## Proxy Server 使用方法
-
-### **使用方法**
-
-1. 確認 **hosts** 有設定：
-
-```
-127.0.0.1 url
-```
-
-2. 確認 mkcert 生成的憑證路徑正確：
-
-```
-C:/mkcert/url.pem
-C:/mkcert/url-key.pem
-```
-
-3. 確保本地服務 `3002` 正在運行
-
-4. 運行 Node.js 檔案：
-
-```bash
-node https-to-http-proxy.js
-```
-
-5. 打開 Chrome：
-
-```
-https://url/dashboard
-```
-
-✅ 自動跳轉到：
-
-```
-http://localhost:3002/dashboard
-```
-
----
-
-## 🚀 Getting Started
-
-Install dependencies:
-
-```bash
-npm install
-````
-
-or if using pnpm:
-
-```bash
-pnpm install
-```
-
-Run a specific package:
-
-```bash
-npm run --workspace=packages/domain-checker start
-```
-
----
-
-## 🧪 Development Principles
-
-- Small, composable modules
-- Zero business logic inside toolkit
-- Infrastructure-focused
-- Side-effect minimal
-- Testable by default
-
----
-
-## 📐 Design Philosophy
-
-Dev Toolkit is:
-
-- Infrastructure-first
-- Environment-agnostic
-- Framework-neutral
-- Production-oriented
-
-It is not:
-
-- A UI component library
-- A business logic repository
-- A feature-specific implementation
-
----
-
-## 🔐 Reliability Strategy
-
-Network-related tools should:
-
-- Never rely solely on system network state
-- Validate connectivity through real requests
-- Handle VPN / Proxy edge cases
-- Provide fail-safe fallbacks
-
----
-
-## 📈 Future Expansion
-
-- Monitoring integrations
-- CLI tooling
-- CI validation scripts
-- Automated infrastructure diagnostics
-- Security scanning utilities
-
----
-
-## 🏷 Naming Convention
-
-Internal packages follow:
-
-```
-@dev-toolkit/<package-name>
-```
-
-Example:
-
-```
-@dev-toolkit/network
-@dev-toolkit/domain-checker
-@dev-toolkit/fail-safe
-```
+1. 在 `node/` 目錄下建立新資料夾。
+2. 在 `cli.js` 的 `tools` 陣列中新增選項。
+3. 確保你的腳本可以使用 `node path/to/script.js` 獨立執行。
 
 ---
 
 ## 📄 License
 
 Internal Use Only
-
-```
-
----
-
-如果你想再升級一層，我可以幫你做：
-
-- 🔥 FAANG 等級 monorepo README（含版本策略 / branching model）
-- 🔥 加入 Conventional Commit 規範
-- 🔥 加入 CI/CD 設計說明
-- 🔥 加入 Architecture Decision Record (ADR) 區塊
-- 🔥 加入 Package Template 範本
-
-你這個 dev-toolkit 如果設計好，其實可以變成公司技術核心基石 😏
-```
