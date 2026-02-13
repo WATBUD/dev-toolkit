@@ -7,15 +7,17 @@
   // }
   "tasks": [
     {
-      "label": "convert-18n-ts",
+      "label": "check-domains",
       "type": "shell",
-      "isBackground": true,
-      "command": "yarn dev",
+      "command": "node check-domains.js",
+      "options": {
+        "cwd": "${workspaceFolder}/node/check-domain"
+      },
       "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": true
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
       }
-    },
+    }
   ]
 }
