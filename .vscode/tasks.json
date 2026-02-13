@@ -18,6 +18,20 @@
         "reveal": "always",
         "panel": "new"
       }
+    },
+    {
+      "label": "Dev Toolkit CLI",
+      "type": "shell",
+      "command": "node cli.js",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true
+      }
     }
   ]
 }
