@@ -30,6 +30,12 @@ const tools = [
     description: "啟動 HTTPS 到 HTTP 的代理伺服器 (進階版本)",
   },
   {
+    name: `${chalk.magenta("🎮 Nova Game History")} - Novax 遊戲歷史分析`,
+    value: "nova-game",
+    script: "node/invest/nova.js",
+    description: "抓取並分析 Novax 遊戲歷史數據",
+  },
+  {
     name: chalk.gray("❌ Exit"),
     value: "exit",
     description: "退出工具選單",
