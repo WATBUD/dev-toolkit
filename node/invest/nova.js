@@ -1,4 +1,7 @@
 const axios = require("axios");
+const fs = require("fs");
+const { Console } = require("console");
+const path = require("path");
 
 const url = "https://www.play.novax.game/History/getUfoBetHistoryData";
 
@@ -34,14 +37,42 @@ function extractTotalPages(paginationHtml) {
 }
 
 async function run() {
-  console.log("開始抓資料...");
+  const logFileName = `nova_report_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+  const logFilePath = path.join(__dirname, logFileName);
+  const fileOutput = fs.createWriteStream(logFilePath);
+  const logger = new Console({ stdout: process.stdout, stderr: process.stderr });
+  
+  // 自定義 log 函數，同時輸出到控制台和檔案
+  function customLog(...args) {
+    logger.log(...args);
+    const line = args.map(arg => 
+      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+    ).join(' ') + '\n';
+    fileOutput.write(line);
+  }
+
+  // 自定義 table 函數，將表格寫入檔案
+  function customTable(data) {
+    console.table(data); // 終端顯示
+    
+    if (data.length === 0) return;
+    const headers = Object.keys(data[0]);
+    let tableText = '\n' + headers.join('\t') + '\n';
+    tableText += '-'.repeat(headers.join('\t').length) + '\n';
+    data.forEach(row => {
+      tableText += headers.map(h => row[h]).join('\t') + '\n';
+    });
+    fileOutput.write(tableText + '\n');
+  }
+
+  customLog("開始抓資料...");
 
   const firstPage = await fetchPage(1);
 
   const totalPages = extractTotalPages(firstPage.pagination);
   const recordsPerPage = firstPage.transactions.length;
-  console.log("總頁數:", totalPages);
-  console.log("每頁筆數:", recordsPerPage);
+  customLog("總頁數:", totalPages);
+  customLog("每頁筆數:", recordsPerPage);
 
   // 初始化資料並記錄來源頁碼
   let all = firstPage.transactions.map(t => ({ ...t, sourcePage: 1 }));
@@ -49,11 +80,11 @@ async function run() {
   for (let i = 2; i <= totalPages; i++) {
     const data = await fetchPage(i);
     all.push(...data.transactions.map(t => ({ ...t, sourcePage: i })));
-    console.log(`抓到第 ${i} 頁`);
+    customLog(`抓到第 ${i} 頁`);
     await new Promise(r => setTimeout(r, 400));
   }
 
-  console.log("總筆數:", all.length);
+  customLog("總筆數:", all.length);
 
   // ===== 統計 =====
   let totalBet = 0;
@@ -92,15 +123,15 @@ async function run() {
   const winRate = winCount / all.length;
   const netProfit = totalReturn - totalBet;
 
-  console.log("\n====== 統計結果 ======");
-  console.log("總下注:", totalBet.toFixed(4));
-  console.log("總回收:", totalReturn.toFixed(4));
-  console.log("淨利潤:", netProfit.toFixed(4));
-  console.log("RTP:", (rtp * 100).toFixed(2) + "%");
-  console.log("勝率:", (winRate * 100).toFixed(2) + "%");
-  console.log("輸場數:", lossCount);
+  customLog("\n====== 統計結果 ======");
+  customLog("總下注:", totalBet.toFixed(4));
+  customLog("總回收:", totalReturn.toFixed(4));
+  customLog("淨利潤:", netProfit.toFixed(4));
+  customLog("RTP:", (rtp * 100).toFixed(2) + "%");
+  customLog("勝率:", (winRate * 100).toFixed(2) + "%");
+  customLog("輸場數:", lossCount);
 
-  console.log("\n====== Crash倍率分布 (maxmultiplier) ======");
+  customLog("\n====== Crash倍率分布 (maxmultiplier) ======");
   let cumulativeCount = 0;
   const sortedStats = Object.keys(maxMultiplierStats)
     .sort((a, b) => {
@@ -118,7 +149,10 @@ async function run() {
         "來源頁數": Array.from(pages).sort((x, y) => x - y).join(", ")
       };
     });
-  console.table(sortedStats);
+  
+  customTable(sortedStats);
+  console.log(`\n✅ 報表已儲存至: ${logFilePath}`);
+  fileOutput.end();
 }
 
 run().catch(err => console.error(err));
