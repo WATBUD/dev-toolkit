@@ -11,7 +11,7 @@
       "type": "shell",
       "command": "node check-domains.js",
       "options": {
-        "cwd": "${workspaceFolder}/node/check-domain"
+        "cwd": "${workspaceFolder}/toolkit-cli/node/check-domain"
       },
       "problemMatcher": [],
       "presentation": {
@@ -24,7 +24,7 @@
       "type": "shell",
       "command": "node cli.js",
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}/toolkit-cli"
       },
       "problemMatcher": [],
       "presentation": {
