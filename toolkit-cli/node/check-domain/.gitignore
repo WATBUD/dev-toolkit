@@ -1,0 +1,3 @@
+# 本機自己的網域清單與檢查結果，不進版控（第一次執行會從 domains.example.json 自動建立 domains.json）
+domains.json
+domain-result.json

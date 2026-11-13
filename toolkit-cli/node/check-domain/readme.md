@@ -46,8 +46,9 @@ If using ES modules, add this to your `package.json`:
 ```
 .
 ├── check-domains.js
-├── domains.json
-├── domain-result.json (generated)
+├── domains.example.json   (範例，進版控)
+├── domains.json           (你的網域清單，本機產生，不進版控)
+├── domain-result.json     (檢查結果，本機產生，不進版控)
 └── README.md
 ```
 
@@ -55,7 +56,10 @@ If using ES modules, add this to your `package.json`:
 
 ## 📝 domains.json Format
 
-Create a `domains.json` file:
+第一次執行時若沒有 `domains.json`，會自動從 `domains.example.json` 複製一份，填入你要檢查的網域後再執行一次。
+`domains.json` 與 `domain-result.json` 都已被 `.gitignore` 排除，只存在你的電腦。
+
+Format:
 
 ```json
 {
