@@ -1,0 +1,7 @@
+{
+  "code": 0,
+  "msg": "Success",
+  "data": {
+    "message": "hello from mock-server example"
+  }
+}

@@ -1,0 +1,72 @@
+# See http://help.github.com/ignore-files/ for more about ignoring files.
+
+# compiled output
+/dist
+/tmp
+/out-tsc
+
+# dependencies
+/node_modules
+.angular/cache/
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+testem.log
+/typings
+yarn-error.log
+
+# e2e
+/e2e/*.js
+/e2e/*.map
+
+# System Files
+.DS_Store
+Thumbs.db
+
+src/app/app.local.ts
+src/app/app.services.ts
+
+proxy.conf.json
+src/default.color.scss
+src/favicon.ico
+
+src/assets/images/promotion/bg-block.svg
+src/assets/images/promotion/bg-block-mobile.svg
+src/assets/images/promotion/bg-btn.svg
+src/assets/images/promotion/bg-title.svg
+
+.env
+logs
+public/themes
+build-info.json
+reload-trigger
+
+# mock 錄製產出,各自跑各自的,不進 repo
+**/latest.json
+
+# ---- 私有資料：真實 API handler / 錄製 / 專案設定都不進版控，只保留 _example ----
+/src/mocks/*
+!/src/mocks/_example/
+!/src/mocks/_example/**/latest.json
+.env.*
+!.env.example
+/src/config/projects.local.ts

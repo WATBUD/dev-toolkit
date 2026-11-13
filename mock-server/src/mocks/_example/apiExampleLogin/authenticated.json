@@ -1,0 +1,9 @@
+{
+  "code": 0,
+  "msg": "Success",
+  "data": {
+    "userId": 1,
+    "username": "example-user",
+    "accessToken": "example-token-not-a-real-jwt"
+  }
+}
