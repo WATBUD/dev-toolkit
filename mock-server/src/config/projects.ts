@@ -6,7 +6,8 @@
 //   <SLOT>_PORT / <SLOT>_WS_PORT / <SLOT>_PROXY_PORT   主伺服器 / SignalR / 純代理（選填）
 // 預設 port：slot A 為 3200 / 8080 / 3201，之後每個 slot 往上 +10（B 為 3210 / 8090 / 3211）。
 //
-// 一個 slot 都沒設時，使用版控內的範例專案 `_example`。
+// 一個 slot 都沒設時，使用版控內的範例專案（預設 id 為 `_example`，可用 EXAMPLE_PROJECT_ID 覆寫；
+// 對應的 src/mocks/<id>/ 資料夾必須存在）。
 export interface ProjectConfig {
   id: string;
   port: number; // 主伺服器
@@ -16,6 +17,14 @@ export interface ProjectConfig {
 }
 
 const SLOTS = ["A", "B", "C", "D", "E", "F"];
+
+// id 會拿來組檔案路徑，只允許安全字元，避免 ../ 之類的路徑跳脫。
+const assertSafeId = (id: string, name: string): string => {
+  if (!/^[A-Za-z0-9_-]+$/.test(id)) {
+    throw new Error(`[Config] ${name}="${id}" 只能包含英數、底線、連字號`);
+  }
+  return id;
+};
 
 const toPort = (raw: string | undefined, fallback: number, name: string): number => {
   if (raw === undefined || raw.trim() === "") return fallback;
@@ -31,12 +40,8 @@ function fromEnv(): ProjectConfig[] {
   SLOTS.forEach((slot, i) => {
     const id = process.env[`${slot}_PROJECT_ID`]?.trim();
     if (!id) return;
-    // id 會拿來組檔案路徑，只允許安全字元，避免 ../ 之類的路徑跳脫。
-    if (!/^[A-Za-z0-9_-]+$/.test(id)) {
-      throw new Error(`[Config] ${slot}_PROJECT_ID="${id}" 只能包含英數、底線、連字號`);
-    }
     list.push({
-      id,
+      id: assertSafeId(id, `${slot}_PROJECT_ID`),
       port: toPort(process.env[`${slot}_PORT`], 3200 + i * 10, `${slot}_PORT`),
       wsPort: toPort(process.env[`${slot}_WS_PORT`], 8080 + i * 10, `${slot}_WS_PORT`),
       proxyPort: toPort(process.env[`${slot}_PROXY_PORT`], 3201 + i * 10, `${slot}_PROXY_PORT`),
@@ -63,7 +68,7 @@ function validate(list: ProjectConfig[]): ProjectConfig[] {
 
 const defaults: ProjectConfig[] = [
   {
-    id: "_example",
+    id: assertSafeId(process.env.EXAMPLE_PROJECT_ID?.trim() || "_example", "EXAMPLE_PROJECT_ID"),
     port: 3200,
     wsPort: 8080,
     proxyPort: 3201,
