@@ -1,0 +1,5 @@
+node_modules
+.DS_Store
+.env
+# 使用者資料（含 token / 密碼），絕不進版控
+data/
