@@ -1,5 +1,16 @@
 node_modules
 .DS_Store
 .env
-# 使用者資料（含 token / 密碼），絕不進版控
+# 使用者資料（含 token / 密碼 / 請求的 curl），絕不進版控
+test-data/
 data/
+
+# 不管放在哪個資料夾、資料夾叫什麼名字，這些都是使用者資料（可能含 token / 密碼 / Cookie）
+environments.json
+session.json
+history.json
+collections.json
+_collection.json
+*.curl
+.trash/
+_history/
