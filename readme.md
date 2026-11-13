@@ -4,7 +4,7 @@
 
 | 資料夾 | 內容 | 啟動 |
 |---|---|---|
-| [`toolkit-cli/`](toolkit-cli/readme.md) | 互動式 CLI：域名檢查、HTTPS 代理、投資分析腳本 | `npm run cli` |
+| [`toolkit-cli/`](toolkit-cli/readme.md) | 互動式 CLI：域名檢查、HTTPS 代理 | `npm run cli` |
 | [`mock-server/`](mock-server) | 多專案 MSW mock server，支援上游錄製與回放；專案由 `.env` 的 `<SLOT>_PROJECT_ID` 決定 | `npm run mock` |
 | [`api-tester/`](api-tester/README.md) | 本機 Postman 類 API 測試工具（零依賴、無 CORS、資料存本機 `data/`） | `npm run tester` |
 
