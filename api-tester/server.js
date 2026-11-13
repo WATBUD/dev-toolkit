@@ -6,15 +6,22 @@ const crypto = require("crypto");
 const path = require("path");
 
 const PORT = Number(process.env.PORT || 5757);
-// 使用者資料（集合、環境變數含機密、歷史、分頁）存在這個資料夾，已加入 .gitignore。
-const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "data"));
-// 依敏感度分檔：environments.json 含密碼 / token，要分享集合時可以只給 collections.json。
+// 使用者資料存在 test-data/（已被 git 忽略）：
+//   <分組>/<API 名稱>.curl   每個請求一個純 curl 檔（例：bo/GetRSAPublicKey.curl）
+//   <分組>/_collection.json   該分組的設定（登入請求、token header…）
+//   _history/<時間>_<方法>_<路徑>_<id>.curl   送出歷史
+//   environments.json   環境變數（含機密）
+//   session.json        開著的分頁
+//   .trash/<時間>/…     被刪除的請求檔會先搬到這裡，不直接刪除
+const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "test-data"));
 const STORE = {
-  "collections.json": ["colls"],
   "environments.json": ["envs", "env"],
-  "history.json": ["hist"],
   "session.json": ["tabs", "active"],
 };
+const MAX_FILE = 2 * 1024 * 1024; // 單一 curl 檔上限
+const MAX_FILES = 5000;
+// 允許寫入/刪除的相對路徑（防路徑跳脫）：只准這兩種位置、副檔名固定、不能以 . 開頭。
+const FILE_RE = /^(?:[^/\\\0._][^/\\\0]{0,119}\/(?:[^/\\\0.][^/\\\0]{0,159}\.curl|_collection\.json)|_history\/[^/\\\0.][^/\\\0]{0,199}\.curl)$/;
 const HOST = "127.0.0.1"; // 只綁本機，不對外
 const MAX_REQ_BODY = 50 * 1024 * 1024;
 const MAX_RES_BODY = 50 * 1024 * 1024;
@@ -63,33 +70,92 @@ function guardRead(req, res) {
   if (req.headers.origin && !sameOrigin(req.headers.origin.replace(/^https?:\/\//, ""))) { send(res, 403, { error: "bad origin" }); return false; }
   return true;
 }
+const stamp = () => new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "");
+// 把相對路徑解析到 DATA_DIR 底下；跳出資料夾就丟錯。
+function safeAbs(rel) {
+  const abs = path.resolve(DATA_DIR, rel);
+  if (abs !== DATA_DIR && !abs.startsWith(DATA_DIR + path.sep)) throw new Error("path escapes data dir: " + rel);
+  return abs;
+}
+function writeAtomic(abs, text) {
+  fs.mkdirSync(path.dirname(abs), { recursive: true, mode: 0o700 });
+  const tmp = `${abs}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, text, { mode: 0o600 }); // 先寫暫存再 rename，避免寫到一半被中斷而損毀
+  fs.renameSync(tmp, abs);
+  fs.chmodSync(abs, 0o600);
+}
+// 請求檔不直接刪：搬到 .trash/<時間>/ 保留相對路徑，要找回只要搬回去。
+function moveToTrash(rel, batch) {
+  const from = safeAbs(rel);
+  if (!fs.existsSync(from)) return;
+  const to = safeAbs(path.join(".trash", batch, rel));
+  fs.mkdirSync(path.dirname(to), { recursive: true, mode: 0o700 });
+  fs.renameSync(from, to);
+  try { fs.rmdirSync(path.dirname(from)); } catch { /* 資料夾不是空的就保留 */ }
+}
+// 讀出 collections/ 與 history/ 底下所有 curl 檔。檔案壞掉/過大時略過該檔，不影響其他檔。
+function readCurlFiles() {
+  const files = {}; let n = 0;
+  const read = (rel) => {
+    if (n >= MAX_FILES || !FILE_RE.test(rel)) return;
+    const abs = safeAbs(rel);
+    const st = fs.statSync(abs);
+    if (!st.isFile() || st.size > MAX_FILE) return;
+    files[rel] = fs.readFileSync(abs, "utf8"); n++;
+  };
+  const ls = (rel) => { try { return fs.readdirSync(safeAbs(rel), { withFileTypes: true }); } catch (e) { if (e.code === "ENOENT") return []; throw e; } };
+  for (const d of ls("")) {
+    if (!d.isDirectory() || d.name.startsWith(".") || d.name === "node_modules") continue;
+    if (d.name === "_history") continue;
+    if (d.name.startsWith("_")) continue; // 以 _ 開頭的資料夾留給系統用
+    for (const f of ls(d.name)) if (f.isFile() && (f.name.endsWith(".curl") || f.name === "_collection.json")) read(`${d.name}/${f.name}`);
+  }
+  for (const f of ls("_history")) if (f.isFile() && f.name.endsWith(".curl")) read(`_history/${f.name}`);
+  return files;
+}
 function handleStoreGet(req, res) {
   if (!guardRead(req, res)) return;
   const state = {}; let found = false;
-  for (const [file, keys] of Object.entries(STORE)) {
-    try {
-      const j = JSON.parse(fs.readFileSync(path.join(DATA_DIR, file), "utf8"));
-      found = true;
-      for (const k of keys) if (k in j) state[k] = j[k];
-    } catch (e) {
-      if (e.code !== "ENOENT") return send(res, 500, { error: `讀取 ${file} 失敗：${e.message}` }); // 檔案壞掉就明確報錯，不要靜默當成空資料
+  try {
+    for (const [file, keys] of Object.entries(STORE)) {
+      try {
+        const j = JSON.parse(fs.readFileSync(path.join(DATA_DIR, file), "utf8"));
+        found = true;
+        for (const k of keys) if (k in j) state[k] = j[k];
+      } catch (e) {
+        if (e.code !== "ENOENT") return send(res, 500, { error: `讀取 ${file} 失敗：${e.message}` }); // 檔案壞掉就明確報錯，不要靜默當成空資料
+      }
     }
-  }
-  send(res, 200, { ...state, empty: !found, dir: DATA_DIR });
+    const files = readCurlFiles();
+    send(res, 200, { ...state, files, dir: DATA_DIR, empty: !found && !Object.keys(files).length });
+  } catch (e) { send(res, 500, { error: "讀取失敗：" + e.message }); }
 }
 async function handleStorePut(req, res) {
   if (!guard(req, res)) return;
   let st;
   try { st = JSON.parse((await readBody(req)).toString("utf8")); } catch (e) { return send(res, 400, { error: "invalid JSON" }); }
   if (!st || typeof st !== "object" || Array.isArray(st)) return send(res, 400, { error: "state must be an object" });
+  const put = st.put && typeof st.put === "object" && !Array.isArray(st.put) ? st.put : {};
+  const del = Array.isArray(st.del) ? st.del : [];
+  // 先全部驗證完才動磁碟：任何一個路徑不合法就整個拒絕。
+  for (const p of [...Object.keys(put), ...del]) {
+    if (typeof p !== "string" || !FILE_RE.test(p) || p.split("/").includes("..")) return send(res, 400, { error: `不合法的路徑：${String(p).slice(0, 80)}` });
+  }
+  for (const [p, t] of Object.entries(put)) {
+    if (typeof t !== "string" || Buffer.byteLength(t) > MAX_FILE) return send(res, 400, { error: `檔案內容不合法或過大：${p}` });
+  }
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
     for (const [file, keys] of Object.entries(STORE)) {
+      if (!keys.some((k) => k in st)) continue;
       const part = {}; for (const k of keys) if (k in st) part[k] = st[k];
-      const target = path.join(DATA_DIR, file), tmp = `${target}.tmp-${process.pid}`;
-      fs.writeFileSync(tmp, JSON.stringify(part, null, 2), { mode: 0o600 }); // 先寫暫存再 rename，避免寫到一半被中斷而損毀
-      fs.renameSync(tmp, target);
-      fs.chmodSync(target, 0o600);
+      writeAtomic(path.join(DATA_DIR, file), JSON.stringify(part, null, 2));
+    }
+    for (const [p, t] of Object.entries(put)) writeAtomic(safeAbs(p), t);
+    const batch = stamp();
+    for (const p of del) {
+      if (p.startsWith("_history/")) { try { fs.unlinkSync(safeAbs(p)); } catch (e) { if (e.code !== "ENOENT") throw e; } } // 歷史是有上限的滾動紀錄，直接刪
+      else moveToTrash(p, batch); // 請求檔先進垃圾桶
     }
     send(res, 200, { ok: true });
   } catch (e) { send(res, 500, { error: "寫入失敗：" + e.message }); }
@@ -162,4 +228,8 @@ http.createServer(async (req, res) => {
       res.end(data);
     });
   } catch (e) { send(res, 500, { error: e.message }); }
-}).listen(PORT, HOST, () => console.log(`api-tester  http://${HOST}:${PORT}\n資料資料夾  ${DATA_DIR}`));
+}).listen(PORT, HOST, () => {
+  // 資料夾由每個使用者在本機自己產生（不進版控）；第一次啟動就建好，方便直接把 curl 檔放進去
+  fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+  console.log(`api-tester  http://${HOST}:${PORT}\n資料資料夾  ${DATA_DIR}\n把 curl 存成 ${path.join(DATA_DIR, "<分組>", "<名稱>.curl")} 即會自動載入`);
+});

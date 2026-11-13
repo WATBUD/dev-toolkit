@@ -29,6 +29,11 @@ header h1{font-size:14px;margin:0;white-space:nowrap}
 .mt{font:700 10px ui-monospace,monospace;min-width:38px;text-align:center}
 .GET{color:var(--ok)}.POST{color:var(--warn)}.PUT{color:var(--pri)}.PATCH{color:#7c3aed}.DELETE{color:var(--bad)}
 .coll{margin-bottom:6px}.coll>.ch{display:flex;align-items:center;gap:4px;font-weight:600;padding:3px 2px}.coll>.ch span{flex:1}
+#work[hidden],.empty[hidden]{display:none!important}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--mut)}
+.var{border:1px solid var(--bd);border-radius:6px;padding:6px 8px;margin-bottom:6px}
+.vval{font:12px/1.4 ui-monospace,Menlo,monospace;word-break:break-all;margin:2px 0}
+.vsec{font-weight:600;font-size:12px;color:var(--mut);margin:10px 0 6px}
 #main{display:flex;flex-direction:column;min-width:0;min-height:0}
 #rtabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--bd);background:var(--card)}
 .rt{display:flex;align-items:center;gap:6px;padding:6px 10px;border-right:1px solid var(--bd);cursor:pointer;white-space:nowrap;max-width:200px;color:var(--mut)}
@@ -67,11 +72,16 @@ table{border-collapse:collapse;width:100%}td{border-bottom:1px solid var(--bd);p
 </header>
 <div id="app">
   <aside id="side">
-    <div class="stabs"><button data-s="coll" class="on">集合</button><button data-s="hist">歷史</button></div>
+    <div class="stabs"><button data-s="coll" class="on">集合</button><button data-s="hist">歷史</button><button data-s="vars">變數</button></div>
     <div class="sbody" id="sbody"></div>
   </aside>
   <div id="main">
     <div id="rtabs"></div>
+    <div id="empty" class="empty" hidden>
+      <div style="font-size:15px;color:var(--fg)">沒有開啟的請求</div>
+      <div>從左邊的集合點一個請求，或按上方的 ＋ 新增</div>
+      <button class="pri" id="empty-new">＋ 新增請求</button>
+    </div>
     <div id="work">
       <div class="urlbar">
         <select id="method"></select>
@@ -99,32 +109,43 @@ table{border-collapse:collapse;width:100%}td{border-bottom:1px solid var(--bd);p
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 9);
-const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
-const blank = () => ({ id: uid(), name: '', method: 'GET', url: '', params: [], headers: [], bodyType: 'none', body: '', form: [], auth: { type: 'none', token: '', user: '', pass: '' }, extract: [], collId: '', dirty: false, res: null });
+const blank = () => ({ id: uid(), name: '', method: 'GET', url: '', params: [], headers: [], bodyType: 'none', body: '', form: [], auth: { type: 'none', token: '', user: '', pass: '' }, extract: [], next: '', collId: '', dirty: false, res: null });
 const S = {
-  tabs: [blank()], active: null, colls: [], hist: [], envs: [], env: '',
+  tabs: [], active: null, colls: [], hist: [], envs: [], env: '',
   side: 'coll', reqTab: 'params', resTab: 'body', pretty: true,
 };
-if (!S.tabs.find((t) => t.id === S.active)) S.active = S.tabs[0].id;
 const cur = () => S.tabs.find((t) => t.id === S.active);
-// ---- 持久化：存到 server 的 data/ 資料夾（不再依賴瀏覽器 localStorage）----
+// ---- 持久化：存到 server 的 test-data/ 資料夾（每個使用者本機自己產生，不進版控）----
 let ready = false, dirty = false, saveTimer = null, dataDir = '';
-const snapshot = () => ({ tabs: S.tabs.map(({ res, ...t }) => t), active: S.active, colls: S.colls, hist: S.hist, envs: S.envs, env: S.env });
+// 集合與歷史存成 test-data/<分組>/<名稱>.curl、test-data/_history/*.curl（每個請求一個純 curl 檔）；分組設定、session、環境變數是 JSON。
+// baseline = 目前磁碟上（本頁面載入或寫入過）的 路徑 -> 內容；只送出與 baseline 不同的檔案，
+// 所以你手動編輯、本頁面沒動到的檔案不會被蓋掉。unparsed = 讀得到但解析不了的檔案：原樣保留，絕不寫入/刪除。
+let baseline = {}, unparsed = {}, diskSnapshot = {}; // diskSnapshot：磁碟上目前的原始檔案內容（路徑 -> 文字）
+const FILE_OF = new Map(); // 請求 id -> { file, forName }：沿用磁碟上的檔名，改名才換檔
+const DIR_OF = new Map();  // 集合 id -> { dir, forName }
+const snapshot = () => ({ tabs: S.tabs.map(({ res, ...t }) => t), active: S.active, envs: S.envs, env: S.env });
 function setSaved(state, msg) {
   const el = $('#saved'); if (!el) return;
   el.textContent = state === 'ok' ? '💾 已儲存' : state === 'busy' ? '💾 儲存中…' : '⚠️ ' + msg;
   el.style.color = state === 'err' ? 'var(--bad)' : ''; el.title = dataDir ? '資料位置：' + dataDir : '';
 }
 function persist() { if (!ready) return; dirty = true; clearTimeout(saveTimer); setSaved('busy'); saveTimer = setTimeout(() => flush(), 300); }
-async function flush(keepalive, force) {
+let flushChain = Promise.resolve();
+function flush(keepalive, force) { return (flushChain = flushChain.then(() => doFlush(keepalive, force))); } // 序列化，避免兩次存檔交錯
+async function doFlush(keepalive, force) {
   if (!ready || (!dirty && !force)) return; clearTimeout(saveTimer); // 沒有未存變更就不寫，避免蓋掉外部（手動 / 其他分頁）對檔案的修改
-  const body = JSON.stringify(snapshot());
+  const files = buildFiles();
+  const put = {}, del = [];
+  for (const [p, t] of Object.entries(files)) if (baseline[p] !== t) put[p] = t;
+  for (const p of Object.keys(baseline)) if (!(p in files) && !(p in unparsed)) del.push(p);
+  const body = JSON.stringify({ ...snapshot(), put, del });
   try {
     const r = await fetch('/store', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body, keepalive: !!keepalive && body.length < 60000 });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status);
-    dirty = false; setSaved('ok');
+    baseline = files; dirty = false; setSaved('ok');
+    for (const p of Object.keys(put)) diskSnapshot[p] = put[p]; for (const p of del) delete diskSnapshot[p]; // 我們自己寫的不算外部修改
   } catch (e) { setSaved('err', '儲存失敗：' + e.message); }
 }
 window.addEventListener('pagehide', () => flush(true));
@@ -182,8 +203,10 @@ async function proxy(p) {
 }
 // 取得 RSA 公鑰：GET 環境變數 rsaKeyUrl，回應 data 為 PEM 字串（或 publicKey / rsaPublicKey / key / pem 欄位）。
 async function getPublicKey() {
+  const pk = String(vars().publicKey || '').trim(); // 取公鑰的請求用 Extract 存成 publicKey 時，直接用它
+  if (pk) return pk;
   const url = sub('{{rsaKeyUrl}}');
-  if (/\{\{/.test(url)) throw new Error('請在環境變數設定 rsaKeyUrl（取得 RSA 公鑰的 GET 網址）');
+  if (/\{\{/.test(url)) throw new Error('沒有公鑰：請先執行取公鑰的請求（Extract 存成 publicKey），或在環境變數設定 rsaKeyUrl');
   if (keyCache[url]) return keyCache[url];
   const j = await proxy({ url, method: 'GET', headers: { Accept: 'application/json' }, timeoutMs: 15000 });
   if (j.error) throw new Error('取得公鑰失敗：' + j.error);
@@ -215,8 +238,20 @@ async function doSend(t) {
   const r = build(t);
   if (!r.url) return { error: '請輸入 URL' };
   if (!/^https?:\/\//i.test(r.url)) r.url = 'http://' + r.url;
+  let autoKey = '';
+  const needsKey = [r.url, r.body, ...Object.values(r.headers)].some((x) => new RegExp(RSA_RE.source).test(String(x ?? '')));
+  if (needsKey && !String(vars().publicKey || '').trim() && /\{\{/.test(sub('{{rsaKeyUrl}}'))) {
+    const co = S.colls.find((c) => c.id === t.collId);
+    const pv = co && co.items.find((i) => i.id !== t.id && (i.extract || []).some((x) => x.on !== false && String(x.v).trim() === 'publicKey'));
+    if (pv) {
+      autoKey = pv.name || pv.url;
+      const tmp = JSON.parse(JSON.stringify(pv)); const pres = await doSend(tmp); applyExtract(tmp, pres);
+      if (pres.error || pres.status >= 400 || !String(vars().publicKey || '').trim())
+        return { error: `自動執行「${autoKey}」取得公鑰失敗` + (pres.error ? '：' + pres.error : pres.status >= 400 ? `（HTTP ${pres.status}）` : '（回應裡找不到要擷取成 publicKey 的欄位）') };
+    }
+  }
   try { await resolveDynamic(r); } catch (e) { return { error: e.message }; }
-  try { return await proxy({ ...r, timeoutMs: 30000 }); } catch (e) { return { error: String(e) }; }
+  try { const res = await proxy({ ...r, timeoutMs: 30000 }); if (autoKey) res.autoKey = autoKey; return res; } catch (e) { return { error: String(e) }; }
 }
 function getPath(o, path) {
   const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
@@ -228,11 +263,12 @@ function getPath(o, path) {
   }
   return v;
 }
-function setVar(k, v) {
+function setVar(k, v, src) {
   let env = S.envs.find((e) => e.id === S.env);
   if (!env) { env = { id: uid(), name: '預設', vars: [] }; S.envs.push(env); S.env = env.id; }
   const ex = env.vars.find((x) => x.k === k);
-  if (ex) ex.v = v; else env.vars.push({ on: true, k, v, secret: /token|pass|secret/i.test(k) });
+  const meta = src ? { src, at: Date.now() } : {}; // src / at：由哪個請求的 Extract、何時存進來（顯示在左側「變數」分頁）
+  if (ex) Object.assign(ex, { v }, meta); else env.vars.push({ on: true, k, v, secret: /token|pass|secret/i.test(k), ...meta });
 }
 function applyExtract(t, res) {
   const rules = (t.extract || []).filter((x) => x.on !== false && x.k && x.v);
@@ -242,7 +278,7 @@ function applyExtract(t, res) {
   for (const x of rules) {
     const v = getPath(j, x.k.trim());
     if (v === undefined || v === null) res.missing.push(x.k);
-    else { setVar(x.v.trim(), typeof v === 'string' ? v : JSON.stringify(v)); res.extracted.push(x.v.trim()); }
+    else { setVar(x.v.trim(), typeof v === 'string' ? v : JSON.stringify(v), t.name || t.url); res.extracted.push(x.v.trim()); }
   }
 }
 async function runLogin(collId) {
@@ -254,11 +290,21 @@ async function runLogin(collId) {
   return { ok: !res.error && res.status >= 200 && res.status < 300 && !(res.missing || []).length, res };
 }
 // 送出 → 擷取變數 → 若 401 且用「集合共用」auth，自動重登一次再重送
-async function execute(t) {
+async function execute(t, depth = 0) {
   let res = await doSend(t); applyExtract(t, res);
   if (!res.error && res.status === 401 && t.auth.type === 'coll' && t.collId) {
     const lg = await runLogin(t.collId);
     if (lg.ok) { res = await doSend(t); applyExtract(t, res); res.relogin = true; } else res.reloginFailed = true;
+  }
+  // 成功（且 Extract 都有取到）後，接著執行同集合裡指定的請求；最多串 5 層避免循環
+  if (t.next && depth < 5 && !res.error && res.status < 400 && !(res.missing || []).length) {
+    const co = S.colls.find((c) => c.id === t.collId);
+    const nx = co && co.items.find((i) => (i.name || '') === t.next && i.id !== t.id);
+    if (!nx) res.chain = [{ name: t.next, error: '找不到這個請求（要在同一個集合裡）' }];
+    else {
+      const nr = await execute({ ...JSON.parse(JSON.stringify(nx)), collId: co.id }, depth + 1);
+      res.chain = [{ name: t.next, status: nr.status, error: nr.error, extracted: nr.extracted, missing: nr.missing, autoKey: nr.autoKey }, ...(nr.chain || [])];
+    }
   }
   return res;
 }
@@ -266,10 +312,14 @@ const badges = (r) =>
   (r.relogin ? '<span class="hint">🔄 已自動重新登入</span>' : '') +
   (r.reloginFailed ? '<span style="color:var(--bad)">自動重登失敗</span>' : '') +
   (r.extracted && r.extracted.length ? `<span class="hint">✔ 已擷取 ${r.extracted.map(esc).join('、')}</span>` : '') +
-  (r.missing && r.missing.length ? `<span style="color:var(--bad)">找不到欄位 ${r.missing.map(esc).join('、')}</span>` : '');
+  (r.missing && r.missing.length ? `<span style="color:var(--bad)">找不到欄位 ${r.missing.map(esc).join('、')}</span>` : '') +
+  (r.autoKey ? `<span class="hint">🔑 已先執行「${esc(r.autoKey)}」取得公鑰</span>` : '') +
+  (r.chain || []).map((c) => c.error
+    ? `<span style="color:var(--bad)">→ ${esc(c.name)}：${esc(c.error)}</span>`
+    : `<span class="hint">→ ${esc(c.name)} <b style="color:${c.status < 400 ? 'var(--ok)' : 'var(--bad)'}">${c.status}</b>${c.extracted && c.extracted.length ? ' ✔ 已擷取 ' + c.extracted.map(esc).join('、') : ''}${c.missing && c.missing.length ? ' ⚠ 找不到 ' + c.missing.map(esc).join('、') : ''}</span>`).join('');
 
 async function sendReq() {
-  const t = cur();
+  const t = cur(); if (!t) return;
   t.res = { loading: true }; renderRes();
   const res = await execute(t); t.res = res;
   if (!res.error) {
@@ -285,14 +335,17 @@ function captureToken(res) { try { const j = JSON.parse(res.body); const f = (o,
 
 /* ---------- 渲染：分頁列 ---------- */
 function renderTabs() {
+  const none = !cur(); $('#work').hidden = none; $('#empty').hidden = !none;
   $('#rtabs').innerHTML = S.tabs.map((t) => `<div class="rt ${t.id === S.active ? 'on' : ''}" data-id="${t.id}"><span class="mt ${t.method}">${t.method}</span><span class="n">${esc(t.name || t.url || '未命名')}</span>${t.dirty ? '<span class="dot">●</span>' : ''}<button class="ghost" data-close="${t.id}">✕</button></div>`).join('') + '<div class="rt" id="newtab">＋</div>';
 }
 $('#rtabs').onclick = (e) => {
   const c = e.target.closest('[data-close]'); if (c) { closeTab(c.dataset.close); return; }
-  if (e.target.closest('#newtab')) { const t = blank(); S.tabs.push(t); S.active = t.id; return all(); }
+  if (e.target.closest('#newtab')) return newTab();
   const r = e.target.closest('.rt[data-id]'); if (r) { S.active = r.dataset.id; all(); }
 };
-function closeTab(id) { S.tabs = S.tabs.filter((t) => t.id !== id); if (!S.tabs.length) S.tabs = [blank()]; if (!S.tabs.find((t) => t.id === S.active)) S.active = S.tabs[0].id; all(); }
+function newTab() { const t = blank(); S.tabs.push(t); S.active = t.id; all(); }
+$('#empty-new').onclick = newTab;
+function closeTab(id) { S.tabs = S.tabs.filter((t) => t.id !== id); if (!S.tabs.find((t) => t.id === S.active)) S.active = S.tabs.length ? S.tabs[S.tabs.length - 1].id : null; all(); }
 
 /* ---------- 渲染：請求區 ---------- */
 const REQTABS = [['params', 'Params'], ['headers', 'Headers'], ['body', 'Body'], ['auth', 'Auth'], ['extract', 'Extract']];
@@ -300,7 +353,7 @@ function kvEditor(arr, key, ph) {
   return arr.map((p, i) => `<div class="kv"><input type="checkbox" data-kv="${key}.${i}.on" ${p.on !== false ? 'checked' : ''}><input data-kv="${key}.${i}.k" value="${esc(p.k)}" placeholder="${ph[0]}" spellcheck="false"><input data-kv="${key}.${i}.v" value="${esc(p.v)}" placeholder="${ph[1]}" spellcheck="false"><button class="ghost" data-del="${key}.${i}">✕</button></div>`).join('') + `<button data-add="${key}">＋ 新增</button>`;
 }
 function renderReq() {
-  const t = cur();
+  const t = cur(); if (!t) return;
   $('#method').value = t.method; if ($('#url') !== document.activeElement) $('#url').value = t.url;
   $('#reqtabs').innerHTML = REQTABS.map(([k, n]) => {
     t.extract = t.extract || [];
@@ -317,6 +370,12 @@ function renderReq() {
     else h += '<p class="hint">這個請求沒有 Body。</p>';
   } else if (S.reqTab === 'extract') {
     h = kvEditor(t.extract, 'extract', ['JSON 路徑（如 accessToken、data.token）', '存成變數（如 token）']) + `<p class="hint">送出成功後自動從回應 JSON 取值存進目前環境，後續用 <code>{{變數名}}</code> 引用。單一欄位名（如 accessToken）會自動在整份回應裡往下找。</p>`;
+    const co = S.colls.find((c) => c.id === t.collId);
+    const names = co ? co.items.filter((i) => i.id !== t.id && i.name).map((i) => i.name) : [];
+    h += `<div class="row" style="margin-top:10px"><label class="hint" style="white-space:nowrap">成功後接著執行</label>`
+      + `<select data-f="next" style="width:240px"><option value="">（不接）</option>${names.map((n) => `<option value="${esc(n)}" ${n === t.next ? 'selected' : ''}>${esc(n)}</option>`).join('')}`
+      + `${t.next && !names.includes(t.next) ? `<option value="${esc(t.next)}" selected>${esc(t.next)}（找不到）</option>` : ''}</select></div>`
+      + `<p class="hint">例：取公鑰的請求擷取 <code>data → publicKey</code>，接著執行「Login」；Login 的密碼欄位寫 <code>{{$rsa(password)}}</code> 就會用剛拿到的公鑰加密。${co ? '' : '<br>⚠️ 這個請求還沒存進集合，存進去才能選。'}</p>`;
   } else {
     h = `<div class="row" style="margin-bottom:6px"><select data-f="auth.type" style="width:180px">${[['none', '無'], ['bearer', 'Bearer Token'], ['basic', 'Basic Auth'], ['coll', '集合共用（自動帶 token）']].map(([k, n]) => `<option value="${k}" ${t.auth.type === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`;
     if (t.auth.type === 'bearer') h += `<input data-f="auth.token" value="${esc(t.auth.token)}" placeholder="token（可用 {{token}}）" spellcheck="false">`;
@@ -328,7 +387,7 @@ function renderReq() {
 const setPath = (o, path, val) => { const p = path.split('.'); const last = p.pop(); const tgt = p.reduce((a, k) => a[k], o); tgt[last] = val; };
 $('#reqtabs').onclick = (e) => { const b = e.target.closest('[data-rt]'); if (b) { S.reqTab = b.dataset.rt; renderReq(); } };
 $('#reqpane').addEventListener('input', (e) => {
-  const t = cur(); const el = e.target;
+  const t = cur(); if (!t) return; const el = e.target;
   if (el.dataset.kv) { const [k, i, f] = el.dataset.kv.split('.'); t[k][i][f] = f === 'on' ? el.checked : el.value; if (k === 'params') { syncUrlFromParams(t); $('#url').value = t.url; } }
   else if (el.dataset.f) setPath(t, el.dataset.f, el.value);
   else if (el.name === 'bt') { t.bodyType = el.value; renderReq(); }
@@ -336,14 +395,14 @@ $('#reqpane').addEventListener('input', (e) => {
 });
 $('#reqpane').addEventListener('change', (e) => { if (e.target.dataset.f === 'auth.type') renderReq(); });
 $('#reqpane').addEventListener('click', (e) => {
-  const t = cur(); const a = e.target.closest('[data-add]'), d = e.target.closest('[data-del]');
+  const t = cur(); if (!t) return; const a = e.target.closest('[data-add]'), d = e.target.closest('[data-del]');
   if (a) { t[a.dataset.add].push({ on: true, k: '', v: '' }); renderReq(); }
   if (d) { const [k, i] = d.dataset.del.split('.'); t[k].splice(+i, 1); if (k === 'params') { syncUrlFromParams(t); $('#url').value = t.url; } t.dirty = true; persist(); renderReq(); renderTabs(); }
   if (e.target.id === 'fmtjson') { try { t.body = JSON.stringify(JSON.parse(sub(t.body)), null, 2); renderReq(); } catch (er) { alert('不是合法 JSON：' + er.message); } }
 });
 $('#method').innerHTML = METHODS.map((m) => `<option>${m}</option>`).join('');
-$('#method').onchange = (e) => { const t = cur(); t.method = e.target.value; t.dirty = true; persist(); renderTabs(); };
-$('#url').oninput = (e) => { const t = cur(); t.url = e.target.value; syncParamsFromUrl(t); t.dirty = true; persist(); renderTabs(); if (S.reqTab === 'params') renderReq(); };
+$('#method').onchange = (e) => { const t = cur(); if (!t) return; t.method = e.target.value; t.dirty = true; persist(); renderTabs(); };
+$('#url').oninput = (e) => { const t = cur(); if (!t) return; t.url = e.target.value; syncParamsFromUrl(t); t.dirty = true; persist(); renderTabs(); if (S.reqTab === 'params') renderReq(); };
 
 /* ---------- 渲染：回應 ---------- */
 const fmtSize = (n) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB');
@@ -359,6 +418,7 @@ function hlJson(src) {
   return out + esc(src.slice(last));
 }
 function renderRes() {
+  if (!cur()) return;
   const r = cur().res, sr = $('#sr'), tabs = $('#restabs'), body = $('#resbody');
   if (!r) { sr.innerHTML = '<span class="hint">按「送出」查看回應</span>'; tabs.hidden = true; body.innerHTML = ''; return; }
   if (r.loading) { sr.innerHTML = '<span class="hint">⏳ 請求中…</span>'; tabs.hidden = true; body.innerHTML = ''; return; }
@@ -376,6 +436,7 @@ function renderRes() {
   else { let txt = r.body, html = null; if (S.pretty && /json/i.test(r.contentType)) { try { txt = JSON.stringify(JSON.parse(r.body), null, 2); html = hlJson(txt); } catch {} } body.innerHTML = `<pre>${html ?? esc(txt)}</pre>`; }
 }
 $('#sr').onclick = (e) => {
+  if (!cur()) return;
   const r = cur().res;
   if (e.target.id === 'copyres') navigator.clipboard.writeText(r.body || '').then(() => (e.target.textContent = '已複製 ✓'));
   if (e.target.id === 'savetok') { const [k, v] = lastToken; let env = S.envs.find((x) => x.id === S.env); if (!env) { env = { id: uid(), name: '預設', vars: [] }; S.envs.push(env); S.env = env.id; } const ex = env.vars.find((x) => x.k === 'token'); ex ? (ex.v = v) : env.vars.push({ on: true, k: 'token', v }); persist(); renderEnv(); e.target.textContent = `已存為 {{token}} ✓`; }
@@ -384,14 +445,34 @@ $('#restabs').onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) 
 $('#restabs').onchange = (e) => { if (e.target.id === 'pretty') { S.pretty = e.target.checked; renderRes(); } };
 
 /* ---------- 側欄 ---------- */
+const revealed = new Set(); // 這次瀏覽中被點開看的機密變數（不存檔，重新整理就恢復遮罩）
+const ago = (ts) => { if (!ts) return ''; const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s} 秒前` : s < 3600 ? `${Math.round(s / 60)} 分鐘前` : s < 86400 ? `${Math.round(s / 3600)} 小時前` : new Date(ts).toLocaleString(); };
+function renderVars() {
+  const env = S.envs.find((e) => e.id === S.env);
+  if (!env) return '<span class="hint">還沒有環境。送出有 Extract 的請求後會自動建立「預設」環境，或在右上角新增。</span>';
+  const vs = env.vars.filter((v) => v.k);
+  const ext = vs.filter((v) => v.src).sort((a, b) => (b.at || 0) - (a.at || 0)), other = vs.filter((v) => !v.src);
+  const row = (v) => {
+    const i = env.vars.indexOf(v), show = !v.secret || revealed.has(v.k), val = String(v.v ?? '');
+    return `<div class="var"><div class="row" style="gap:4px;flex-wrap:nowrap"><b style="flex:1;word-break:break-all">${esc(v.k)}${v.secret ? ' 🔒' : ''}${v.on === false ? ' <span class="hint">（停用）</span>' : ''}</b>`
+      + (v.secret ? `<button class="ghost" data-vshow="${i}" title="顯示 / 隱藏">${show ? '🙈' : '👁'}</button>` : '')
+      + `<button class="ghost" data-vcopy="${i}" title="複製值">📋</button><button class="ghost" data-vdel="${i}" title="刪除這個變數">✕</button></div>`
+      + `<div class="vval">${val ? (show ? esc(val.length > 160 ? val.slice(0, 160) + '…' : val) : '•'.repeat(Math.min(val.length, 24))) : '<span class="hint">（空）</span>'}</div>`
+      + (v.src ? `<div class="hint">← ${esc(v.src)} 擷取 · ${ago(v.at)}${val ? ` · ${val.length} 字元` : ''}</div>` : '') + '</div>';
+  };
+  return `<div class="hint" style="margin-bottom:6px">目前環境：<b>${esc(env.name)}</b>（右上角切換） <button id="vars-edit">編輯</button></div>`
+    + `<div class="vsec">Extract 擷取的值</div>` + (ext.length ? ext.map(row).join('') : '<span class="hint">還沒有。在請求的 Extract 分頁設定規則，送出成功後會出現在這裡。</span>')
+    + `<div class="vsec">其他變數</div>` + (other.length ? other.map(row).join('') : '<span class="hint">（無）</span>');
+}
 function renderSide() {
   document.querySelectorAll('.stabs button').forEach((b) => b.classList.toggle('on', b.dataset.s === S.side));
   const sb = $('#sbody');
+  if (S.side === 'vars') { sb.innerHTML = renderVars(); return; }
   if (S.side === 'hist') {
     sb.innerHTML = (S.hist.length ? `<div class="row" style="margin-bottom:6px"><button id="clrhist">清空歷史</button></div>` : '<span class="hint">還沒有紀錄</span>') +
       S.hist.map((h) => `<div class="item" data-h="${h.id}" title="${esc(h.req.url)}"><span class="mt ${h.req.method}">${h.req.method}</span><span class="n">${esc(h.req.url.replace(/^https?:\/\//, ''))}</span><span class="hint">${h.status}</span></div>`).join('');
   } else {
-    sb.innerHTML = `<div class="row" style="margin-bottom:6px"><button id="newcoll">＋ 新集合</button><button id="tpl" title="建立含 RSA 加密登入的範本（不含任何帳密）">登入範本</button><button id="expall">匯出</button><button id="impall">匯入</button></div>` +
+    sb.innerHTML = `<div class="row" style="margin-bottom:6px"><button id="newcoll">＋ 新集合</button><button id="expall">匯出</button><button id="impall">匯入</button></div>` +
       (S.colls.length ? '' : '<span class="hint">按「儲存」把請求放進集合</span>') +
       S.colls.map((c) => `<div class="coll"><div class="ch"><span>📁 ${esc(c.name)}</span><button class="ghost" data-run="${c.id}" title="依序執行整個集合">▶</button><button class="ghost" data-rc="${c.id}" title="集合設定">⚙</button><button class="ghost" data-dc="${c.id}" title="刪除集合">✕</button></div>` +
         c.items.map((it) => `<div class="item" data-i="${c.id}|${it.id}"><span class="mt ${it.method}">${it.method}</span><span class="n">${esc(it.name || it.url)}</span><button class="ghost" data-di="${c.id}|${it.id}">✕</button></div>`).join('') + '</div>').join('');
@@ -401,9 +482,18 @@ document.querySelector('.stabs').onclick = (e) => { const b = e.target.closest('
 const open = (req) => { const ex = S.tabs.find((t) => t.id === req.id); if (ex) { S.active = ex.id; } else { S.tabs.push({ ...JSON.parse(JSON.stringify(req)), dirty: false, res: null }); S.active = req.id; } all(); };
 $('#sbody').onclick = (e) => {
   const g = (k) => e.target.closest(`[${k}]`);
+  if (e.target.id === 'vars-edit') return $('#envedit').click();
+  const vb = e.target.closest('[data-vshow],[data-vcopy],[data-vdel]');
+  if (vb) {
+    const env = S.envs.find((en) => en.id === S.env); const v = env && env.vars[+(vb.dataset.vshow ?? vb.dataset.vcopy ?? vb.dataset.vdel)];
+    if (!v) return;
+    if (vb.dataset.vshow != null) { revealed.has(v.k) ? revealed.delete(v.k) : revealed.add(v.k); return renderSide(); }
+    if (vb.dataset.vcopy != null) { navigator.clipboard.writeText(String(v.v ?? '')).then(() => { vb.textContent = '✓'; setTimeout(renderSide, 900); }); return; }
+    if (confirm(`刪除變數 ${v.k}？`)) { env.vars.splice(env.vars.indexOf(v), 1); persist(); renderEnv(); renderSide(); }
+    return;
+  }
   if (e.target.id === 'clrhist') { S.hist = []; persist(); return renderSide(); }
   if (e.target.id === 'newcoll') { const n = prompt('集合名稱'); if (n) { S.colls.push({ id: uid(), name: n, items: [] }); persist(); renderSide(); } return; }
-  if (e.target.id === 'tpl') return createLoginTemplate();
   if (e.target.id === 'expall') return download('api-tester-collections.json', JSON.stringify({ colls: S.colls, envs: S.envs.map((en) => ({ ...en, vars: en.vars.map((v) => (v.secret ? { ...v, v: '' } : v)) })) }, null, 2));
   if (e.target.id === 'impall') return importFile();
   let x;
@@ -453,24 +543,9 @@ async function runCollection(id) {
   const end = document.createElement('div'); end.className = 'hint'; end.style.marginTop = '8px';
   end.textContent = failed ? '已中止：有步驟失敗' : '全部完成'; log.appendChild(end);
 }
-// 登入流程範本：只建立骨架，不含任何帳密。密碼請自己在環境變數填（🔒 機密）。
-function createLoginTemplate() {
-  const env = { id: uid(), name: '範本環境', vars: [
-    { on: true, k: 'baseUrl', v: '' }, { on: true, k: 'rsaKeyUrl', v: '{{baseUrl}}/api/AppService/GetRSAPublicKey' },
-    { on: true, k: 'shortName', v: '' }, { on: true, k: 'account', v: '' }, { on: true, k: 'password', v: '', secret: true },
-  ] };
-  const login = { ...blank(), name: '登入', method: 'POST', url: '{{baseUrl}}/api/AppService/Login', bodyType: 'json',
-    body: JSON.stringify({ ShortName: '{{shortName}}', EncryptedPassword: '{{$rsa(password)}}', Account: '{{account}}' }, null, 2),
-    headers: [{ on: true, k: 'Language', v: 'id' }], extract: [{ on: true, k: 'accessToken', v: 'token' }] };
-  const co = { id: uid(), name: '登入流程', items: [], cfg: { loginId: login.id, header: 'Access-Token', prefix: '', cookie: 'authKey' } };
-  login.collId = co.id; co.items.push(strip(login));
-  S.envs.push(env); S.env = env.id; S.colls.push(co); persist(); all();
-  alert('已建立「登入流程」集合與「範本環境」。\n請按右上「編輯」填入 baseUrl、shortName、account、password，再點集合裡的「登入」送出。\n後續請求的 Auth 選「集合共用」，並在集合 ⚙ 確認 token 的 header 名稱（範本預設 Access-Token，並同時寫入 authKey Cookie）。');
-}
-
 /* ---------- 儲存 ---------- */
 $('#save').onclick = () => {
-  const t = cur();
+  const t = cur(); if (!t) return;
   if (!S.colls.length) S.colls.push({ id: uid(), name: '我的集合', items: [] });
   dlg(`<h3 style="margin-top:0">儲存請求</h3><label class="hint">名稱</label><input id="d-name" value="${esc(t.name || t.url.replace(/^https?:\/\//, '').slice(0, 40))}"><label class="hint" style="margin-top:8px">集合</label><select id="d-coll">${S.colls.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select><div class="row" style="margin-top:12px;justify-content:flex-end"><button value="cancel">取消</button><button class="pri" value="ok">儲存</button></div>`, (v) => {
     if (v !== 'ok') return; t.name = $('#d-name').value.trim(); const co = S.colls.find((c) => c.id === $('#d-coll').value);
@@ -481,7 +556,7 @@ $('#save').onclick = () => {
 function dlg(html, cb) { const d = $('#dlg'); $('#dform').innerHTML = html; d.onclose = () => cb(d.returnValue); d.showModal(); }
 
 /* ---------- 環境 ---------- */
-function renderEnv() { $('#envsel').innerHTML = `<option value="">（無環境）</option>` + S.envs.map((e) => `<option value="${e.id}" ${e.id === S.env ? 'selected' : ''}>${esc(e.name)}</option>`).join('') + '<option value="__new">＋ 新增環境…</option>'; }
+function renderEnv() { if (S.side === 'vars') setTimeout(renderSide); $('#envsel').innerHTML = `<option value="">（無環境）</option>` + S.envs.map((e) => `<option value="${e.id}" ${e.id === S.env ? 'selected' : ''}>${esc(e.name)}</option>`).join('') + '<option value="__new">＋ 新增環境…</option>'; }
 $('#envsel').onchange = (e) => { if (e.target.value === '__new') { const n = prompt('環境名稱（如 dev / stg）'); if (n) { const env = { id: uid(), name: n, vars: [{ on: true, k: 'baseUrl', v: '' }] }; S.envs.push(env); S.env = env.id; } } else S.env = e.target.value; persist(); renderEnv(); };
 $('#envedit').onclick = () => {
   const env = S.envs.find((e) => e.id === S.env); if (!env) return alert('請先選擇或新增環境');
@@ -503,14 +578,17 @@ function shellSplit(s) {
     if (c === "'") { const j = s.indexOf("'", i + 1); cur += s.slice(i + 1, j < 0 ? s.length : j); has = true; i = j < 0 ? s.length : j + 1; }
     else if (c === '$' && s[i + 1] === "'") { i += 2; has = true; while (i < s.length && s[i] !== "'") { if (s[i] === '\\') { i++; cur += ({ n: '\n', t: '\t', r: '\r' }[s[i]] ?? s[i]); i++; } else cur += s[i++]; } i++; }
     else if (c === '"') { i++; has = true; while (i < s.length && s[i] !== '"') { if (s[i] === '\\' && i + 1 < s.length) i++; cur += s[i++]; } i++; }
+    else if (c === '\\' && i + 1 < s.length) { cur += s[i + 1]; has = true; i += 2; } // 引號外的 \x 代表字面 x（如 '\'' 內的 \'）
     else if (/\s/.test(c)) { if (has) { out.push(cur); cur = ''; has = false; } i++; }
     else { cur += c; has = true; i++; }
   }
   if (has) out.push(cur); return out;
 }
-function parseCurl(text) {
+const parseForm = (body) => body.split('&').filter(Boolean).map((p) => { const i = p.indexOf('='); const d = (x) => { try { return decodeURIComponent(x.replace(/\+/g, ' ')); } catch { return x; } }; return { on: true, k: d(i < 0 ? p : p.slice(0, i)), v: i < 0 ? '' : d(p.slice(i + 1)) }; });
+// opts.raw：不重新排版 JSON body（curl 檔讀回時要與磁碟內容一致，避免每次載入都產生差異）
+function parseCurl(text, opts = {}) {
   const t = shellSplit(text.trim()); if (t[0] !== 'curl') throw new Error('開頭必須是 curl');
-  const r = { ...blank(), headers: [] }; let data = [], form = false;
+  const r = { ...blank(), headers: [] }; let data = [], form = false; const pos = [];
   for (let i = 1; i < t.length; i++) {
     const a = t[i];
     if (a === '-H' || a === '--header') { const h = t[++i] || ''; const k = h.indexOf(':'); if (k > 0) r.headers.push({ on: true, k: h.slice(0, k).trim(), v: h.slice(k + 1).trim() }); }
@@ -523,21 +601,160 @@ function parseCurl(text) {
     else if (a === '-F' || a === '--form') throw new Error('目前不支援 multipart (-F)');
     else if (/^https?:\/\//i.test(a)) r.url = a;
     else if (a === '--url') r.url = t[++i];
+    else if (!a.startsWith('-')) pos.push(a);
   }
+  // 沒有 http(s):// 開頭的 URL 時（例如 {{baseUrl}}/api/x 這種變數模板），退而求其次用第一個含 {{ 或 / 的位置參數
+  if (!r.url) r.url = pos.find((p) => /\{\{|^\//.test(p)) || '';
   if (!r.url) throw new Error('找不到 URL');
   if (data.length) {
     const body = data.join('&'); r.bodyType = 'text'; r.body = body;
     const ct = (r.headers.find((h) => h.k.toLowerCase() === 'content-type') || {}).v || '';
-    if (/json/i.test(ct) || /^\s*[\[{]/.test(body)) { r.bodyType = 'json'; try { r.body = JSON.stringify(JSON.parse(body), null, 2); } catch {} }
-    else if (/x-www-form-urlencoded/i.test(ct)) { r.bodyType = 'form'; r.form = body.split('&').map((p) => { const i = p.indexOf('='); const d = (x) => { try { return decodeURIComponent(x.replace(/\+/g, ' ')); } catch { return x; } }; return { on: true, k: d(i < 0 ? p : p.slice(0, i)), v: i < 0 ? '' : d(p.slice(i + 1)) }; }); }
+    if (/json/i.test(ct) || /^\s*[\[{]/.test(body)) { r.bodyType = 'json'; if (!opts.raw) { try { r.body = JSON.stringify(JSON.parse(body), null, 2); } catch {} } }
+    else if (/x-www-form-urlencoded/i.test(ct)) { r.bodyType = 'form'; r.form = parseForm(body); }
     if (!t.some((x) => x === '-X' || x === '--request')) r.method = 'POST';
     r.headers = r.headers.filter((h) => h.k.toLowerCase() !== 'content-type' || r.bodyType === 'text');
   }
   syncParamsFromUrl(r); r.name = ''; return r;
 }
+/* ---------- 請求檔：test-data/<分組>/<API 名稱>.curl ---------- */
+// 一個請求 = 一個純 curl 檔，可以直接 `bash 檔名.curl` 執行。curl 表達不了的資訊放在檔案開頭的註解（全部選填）：
+//   # @name 登入              請求名稱（省略時用檔名）
+//   # @extract accessToken -> token     回應 JSON 欄位 → 環境變數
+//   # @auth collection | bearer         集合共用 token / Bearer
+//   # @bodytype json | text | form | none
+// 從 Chrome「Copy as cURL」直接存下來的檔案也能讀。{{變數}} 保持原樣；
+// 要實際執行請用介面上的「curl」按鈕複製已代入變數的版本。
+const qsh = (s) => "'" + String(s).replace(/'/g, "'\\''") + "'";
+const slug = (s) => String(s || '').normalize('NFKC').replace(/[{}]/g, '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/\s+/g, ' ').trim().replace(/^[._]+/, '').slice(0, 80).trim();
+const meta1 = (k, v) => `# @${k} ${String(v).replace(/[\r\n]+/g, ' ')}`;
+const encKv = (x) => encodeURIComponent(x).replace(/%7B%7B/gi, '{{').replace(/%7D%7D/gi, '}}');
+const ord = (v) => (Number.isFinite(v) ? v : 1e9);
+// 沒有 # @id 的檔案 / 沒有 _collection.json 的資料夾：用路徑算出固定 ID，開關多少次都不變（djb2 雜湊）
+const hashId = (prefix, s) => { let h = 5381; for (const ch of s) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0; return prefix + h.toString(36); };
+
+function toCurlFile(t, extra = {}) {
+  const L = ['# api-tester request', meta1('id', t.id)];
+  if (t.name) L.push(meta1('name', t.name));
+  for (const [k, v] of Object.entries(extra)) if (v !== undefined && v !== null) L.push(meta1(k, v));
+  L.push(meta1('bodytype', t.bodyType));
+  if (t.auth.type === 'coll') L.push(meta1('auth', 'collection'));
+  if (t.next) L.push(meta1('next', t.next));
+  (t.extract || []).filter((x) => x.k || x.v).forEach((x) => L.push(meta1(x.on === false ? 'extract-off' : 'extract', `${x.k} -> ${x.v}`)));
+  t.headers.filter((h) => h.on === false && h.k).forEach((h) => L.push(meta1('header-off', `${h.k}: ${h.v}`)));
+  t.params.filter((p) => p.on === false && p.k).forEach((p) => L.push(meta1('param-off', `${p.k}=${p.v}`)));
+  const hs = t.headers.filter((h) => h.on !== false && h.k).map((h) => [h.k, h.v]);
+  const has = (n) => hs.some(([k]) => k.toLowerCase() === n);
+  if (t.auth.type === 'bearer' && t.auth.token && !has('authorization')) { hs.push(['Authorization', 'Bearer ' + t.auth.token]); L.splice(L.findIndex((x) => x.startsWith('# @bodytype')) + 1, 0, meta1('auth', 'bearer')); }
+  let body = '';
+  if (t.bodyType === 'json' || t.bodyType === 'text') { body = t.body; if (!has('content-type')) hs.push(['Content-Type', t.bodyType === 'json' ? 'application/json' : 'text/plain']); }
+  else if (t.bodyType === 'form') { body = t.form.filter((f) => f.on !== false && f.k).map((f) => encKv(f.k) + '=' + encKv(f.v)).join('&'); if (!has('content-type')) hs.push(['Content-Type', 'application/x-www-form-urlencoded']); }
+  const cmd = [`curl -X ${t.method} ${qsh(t.url.trim())}`];
+  hs.forEach(([k, v]) => cmd.push(`-H ${qsh(k + ': ' + v)}`));
+  if (t.auth.type === 'basic' && !has('authorization')) cmd.push(`-u ${qsh(t.auth.user + ':' + t.auth.pass)}`);
+  if (body) cmd.push(`--data-raw ${qsh(body)}`);
+  return L.join('\n') + '\n' + cmd.join(' \\\n  ') + '\n';
+}
+
+function fromCurlFile(text, stem = '', fallbackId = '') {
+  const meta = {}, rest = []; let head = true;
+  for (const l of text.replace(/\r\n/g, '\n').split('\n')) {
+    if (head && (/^\s*#/.test(l) || !l.trim())) { const m = l.match(/^\s*#\s*@([\w-]+)[ \t]?(.*)$/); if (m) (meta[m[1]] ||= []).push(m[2]); continue; }
+    head = false; rest.push(l);
+  }
+  const r = parseCurl(rest.join('\n'), { raw: true });
+  const m1 = (k) => (meta[k] || [])[0];
+  r.id = m1('id') || fallbackId || uid(); r.name = m1('name') || stem; r.next = m1('next') || '';
+  const bt = m1('bodytype');
+  if (bt === 'none') { r.bodyType = 'none'; r.body = ''; }
+  else if (bt === 'json' || bt === 'text') {
+    r.bodyType = bt; if (r.body === undefined) r.body = '';
+    if (bt === 'text') r.headers = r.headers.filter((h) => !(h.k.toLowerCase() === 'content-type' && h.v === 'text/plain'));
+  } else if (bt === 'form' && r.bodyType !== 'form') { r.bodyType = 'form'; r.form = parseForm(r.body || ''); }
+  if (r.bodyType === 'form') r.body = ''; // form 的內容在 r.form，body 欄位不使用
+  if (m1('auth') === 'collection') r.auth = { type: 'coll', token: '', user: '', pass: '' };
+  if (m1('auth') === 'bearer') { // 還原成 Bearer 認證，而不是一個普通的 Authorization header
+    const i = r.headers.findIndex((h) => h.k.toLowerCase() === 'authorization' && /^Bearer /.test(h.v));
+    if (i >= 0) { r.auth = { type: 'bearer', token: r.headers[i].v.slice(7), user: '', pass: '' }; r.headers.splice(i, 1); }
+  }
+  for (const [key, on] of [['extract', true], ['extract-off', false]]) for (const s of meta[key] || []) { const i = s.indexOf(' -> '); if (i > 0) r.extract.push({ on, k: s.slice(0, i).trim(), v: s.slice(i + 4).trim() }); }
+  for (const s of meta['header-off'] || []) { const i = s.indexOf(':'); if (i > 0) r.headers.push({ on: false, k: s.slice(0, i).trim(), v: s.slice(i + 1).trim() }); }
+  for (const s of meta['param-off'] || []) { const i = s.indexOf('='); r.params.push({ on: false, k: i < 0 ? s : s.slice(0, i), v: i < 0 ? '' : s.slice(i + 1) }); }
+  return { req: r, order: Number(m1('order')), at: Number(m1('at')), status: m1('status') ? Number(m1('status')) : undefined, hid: m1('hid') };
+}
+
+function uniqName(base, used, ext = '') {
+  let n = base, i = 2;
+  while (used.has((n + ext).toLowerCase())) n = `${base} (${i++})`;
+  used.add((n + ext).toLowerCase()); return n + ext;
+}
+// 檔名：有名稱就用名稱；沒有名稱就取 URL 路徑最後一段（/api/AppService/GetRSAPublicKey → GetRSAPublicKey）
+const reqFileBase = (t) => {
+  if (slug(t.name)) return slug(t.name);
+  const seg = slug(String(t.url).replace(/^[a-z]+:\/\/[^/]*/i, '').split('?')[0].split('/').filter(Boolean).pop() || '');
+  return seg || slug(`${t.method} ${String(t.url).replace(/^https?:\/\//, '')}`).slice(0, 60) || 'request';
+};
+
+// 由目前狀態產生所有「應該存在」的檔案（路徑 -> 內容）。沿用磁碟上原本的檔名，只有改名/新增才取新檔名。
+function buildFiles() {
+  const files = {}, usedDirs = new Set();
+  S.colls.forEach((c) => { const d = DIR_OF.get(c.id); if (d && d.forName === c.name) usedDirs.add(d.dir.toLowerCase()); });
+  S.colls.forEach((c, ci) => {
+    let d = DIR_OF.get(c.id);
+    if (!d || d.forName !== c.name) { d = { dir: uniqName(slug(c.name) || '未分組', usedDirs), forName: c.name }; DIR_OF.set(c.id, d); }
+    const base = d.dir;
+    if (!(`${base}/_collection.json` in unparsed)) files[`${base}/_collection.json`] = JSON.stringify({ id: c.id, name: c.name, order: ci, cfg: c.cfg || undefined }, null, 2) + '\n';
+    const used = new Set(['_collection.json']);
+    Object.keys(unparsed).filter((p) => p.startsWith(base + '/')).forEach((p) => used.add(p.slice(base.length + 1).toLowerCase()));
+    c.items.forEach((it) => { const f = FILE_OF.get(it.id); if (f && f.forName === it.name) used.add(f.file.toLowerCase()); });
+    c.items.forEach((it, ii) => {
+      let f = FILE_OF.get(it.id);
+      if (!f || f.forName !== it.name) { f = { file: uniqName(reqFileBase(it), used, '.curl'), forName: it.name }; FILE_OF.set(it.id, f); }
+      files[`${base}/${f.file}`] = toCurlFile(it, { order: ii });
+    });
+  });
+  for (const h of S.hist) {
+    const ts = new Date(h.at || 0).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
+    const pth = slug(String(h.req.url).replace(/^[a-z]+:\/\/[^/]*/i, '').split('?')[0]).slice(0, 50);
+    files[`_history/${ts}_${h.req.method}_${pth}_${h.id}.curl`] = toCurlFile(h.req, { hid: h.id, at: h.at, status: h.status });
+  }
+  return files;
+}
+
+// 把磁碟上讀到的檔案還原成集合 / 歷史。
+// 空檔案（0 位元組，例如先建好檔名再貼內容）與解析不了的檔案都放進 unparsed：原樣保留，不覆蓋、不刪除。
+function fromFiles(files) {
+  unparsed = {}; FILE_OF.clear(); DIR_OF.clear();
+  const seen = new Set(), dirs = {}, hist = [];
+  const uniqueId = (id) => { if (!id || seen.has(id)) id = uid(); seen.add(id); return id; };
+  for (const [p, text] of Object.entries(files)) {
+    let m;
+    if ((m = p.match(/^_history\/([^/]+)$/))) {
+      if (!text.trim()) { unparsed[p] = text; continue; }
+      try { const x = fromCurlFile(text); hist.push({ id: x.hid || uid(), at: x.at || 0, status: x.status, req: strip(x.req) }); }
+      catch { unparsed[p] = text; }
+    } else if ((m = p.match(/^([^/]+)\/([^/]+)$/))) {
+      const c = (dirs[m[1]] ||= { dir: m[1], meta: {}, items: [] });
+      if (!text.trim()) { unparsed[p] = text; continue; }
+      try {
+        if (m[2] === '_collection.json') c.meta = JSON.parse(text) || {};
+        else { const x = fromCurlFile(text, m[2].replace(/\.curl$/i, ''), hashId('r', p)); x.req.id = uniqueId(x.req.id); c.items.push({ ...x, f: m[2] }); }
+      } catch { unparsed[p] = text; }
+    }
+  }
+  const colls = Object.values(dirs).map((c) => {
+    const id = uniqueId(c.meta.id || hashId('c', c.dir)), name = c.meta.name || c.dir;
+    DIR_OF.set(id, { dir: c.dir, forName: name });
+    const items = c.items.sort((a, b) => ord(a.order) - ord(b.order) || a.f.localeCompare(b.f)).map((x) => {
+      x.req.collId = id; FILE_OF.set(x.req.id, { file: x.f, forName: x.req.name }); return strip(x.req);
+    });
+    return { id, name, cfg: c.meta.cfg, order: c.meta.order, items };
+  }).sort((a, b) => ord(a.order) - ord(b.order) || a.name.localeCompare(b.name));
+  return { colls, hist: hist.sort((a, b) => b.at - a.at) };
+}
+
 $('#btn-import').onclick = () => dlg(`<h3 style="margin-top:0">匯入 curl</h3><textarea id="d-curl" rows="9" placeholder="貼上整段 curl（支援 Chrome「Copy as cURL」）" style="width:100%"></textarea><div class="row" style="margin-top:10px;justify-content:flex-end"><button value="cancel">取消</button><button class="pri" value="ok">匯入成新分頁</button></div>`, (v) => { if (v !== 'ok') return; try { const r = parseCurl($('#d-curl').value); S.tabs.push(r); S.active = r.id; persist(); all(); } catch (e) { alert(e.message); } });
 const q = (s) => "'" + String(s).replace(/'/g, "'\\''") + "'";
-$('#copycurl').onclick = (e) => { const r = build(cur()); let c = `curl -X ${r.method} ${q(r.url)}`; for (const [k, v] of Object.entries(r.headers)) c += ` \\\n  -H ${q(k + ': ' + v)}`; if (r.body) c += ` \\\n  --data-raw ${q(r.body)}`; navigator.clipboard.writeText(c).then(() => { e.target.textContent = '已複製 ✓'; setTimeout(() => (e.target.textContent = 'curl'), 1200); }); };
+$('#copycurl').onclick = (e) => { if (!cur()) return; const r = build(cur()); let c = `curl -X ${r.method} ${q(r.url)}`; for (const [k, v] of Object.entries(r.headers)) c += ` \\\n  -H ${q(k + ': ' + v)}`; if (r.body) c += ` \\\n  --data-raw ${q(r.body)}`; navigator.clipboard.writeText(c).then(() => { e.target.textContent = '已複製 ✓'; setTimeout(() => (e.target.textContent = 'curl'), 1200); }); };
 
 /* ---------- 匯出入檔案 ---------- */
 function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; a.click(); }
@@ -548,8 +765,9 @@ $('#send').onclick = sendReq;
 document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); sendReq(); } if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); $('#save').click(); } });
 function all() { renderTabs(); renderReq(); renderRes(); renderSide(); renderEnv(); persist(); }
 function apply(st) {
-  S.tabs = st.tabs && st.tabs.length ? st.tabs.map((t) => ({ ...blank(), ...t, res: null })) : [blank()];
-  S.active = S.tabs.find((t) => t.id === st.active) ? st.active : S.tabs[0].id;
+  // 完全空白、沒改過的分頁（沒網址、沒名稱）不保留：不需要「至少一個分頁」，要新的請使用者自己按 ＋
+  S.tabs = (st.tabs || []).filter((t) => t.url || t.name || t.dirty).map((t) => ({ ...blank(), ...t, res: null }));
+  S.active = S.tabs.find((t) => t.id === st.active) ? st.active : (S.tabs[0] ? S.tabs[0].id : null);
   S.colls = st.colls || []; S.hist = st.hist || []; S.envs = st.envs || []; S.env = st.env || '';
 }
 async function boot() {
@@ -562,17 +780,49 @@ async function boot() {
     setSaved('err', '無法讀取本機資料：' + e.message + '（為避免覆蓋已停用儲存）'); all(); return;
   }
   dataDir = st.dir || '';
-  let migrated = false;
+  const hasFiles = st.files && Object.keys(st.files).length;
+  diskSnapshot = { ...(st.files || {}) };
+  if (hasFiles) { const x = fromFiles(st.files); st.colls = x.colls; st.hist = x.hist; }
   if (!st.empty) apply(st);
-  else if (!LS.get('at.migrated', false)) { // 資料夾是空的：把瀏覽器舊資料搬過來（只做一次，且不刪除瀏覽器裡的原資料）
-    const old = { tabs: LS.get('at.tabs', null), active: LS.get('at.active', null), colls: LS.get('at.colls', []), hist: LS.get('at.hist', []), envs: LS.get('at.envs', []), env: LS.get('at.env', '') };
-    if ((old.colls || []).length || (old.envs || []).length || (old.hist || []).length || (old.tabs || []).length) { apply(old); migrated = true; }
-  }
+  // 上次開著的分頁若對應到磁碟上的請求、且沒有未存的修改，就以磁碟上最新內容為準（你在資料夾裡手動改過 curl 也會反映）
+  const byId = new Map(S.colls.flatMap((c) => c.items.map((i) => [i.id, i])));
+  S.tabs = S.tabs.map((t) => { const it = byId.get(t.id); return it && !t.dirty ? { ...blank(), ...JSON.parse(JSON.stringify(it)), res: null } : t; });
+  baseline = hasFiles ? buildFiles() : {}; // 以「載入當下的狀態」為基準，沒改動的檔案維持磁碟原樣
   ready = true; all();
   clearTimeout(saveTimer); dirty = false; // 剛載入不算「有變更」，不要立刻回寫
-  if (migrated) { await flush(false, true); LS.set('at.migrated', true); alert('已把瀏覽器裡的舊資料搬到本機資料夾：\n' + dataDir); }
-  else setSaved('ok');
+  const bad = Object.keys(unparsed).filter((p) => ((st.files || {})[p] || '').trim()); // 空檔案是預先建好的檔名，不提醒
+  setSaved('ok');
+  if (bad.length) alert(`有 ${bad.length} 個檔案無法解析，已原樣保留（不會被修改或刪除）：\n` + bad.slice(0, 8).join('\n'));
 }
+/* ---------- 切回瀏覽器時自動重新讀取資料夾（新增 / 修改 curl 立刻反映）---------- */
+let syncing = false, syncTimer = null;
+const sameFiles = (a, b) => { const ka = Object.keys(a), kb = Object.keys(b); return ka.length === kb.length && ka.every((k) => a[k] === b[k]); };
+async function syncFromDisk() {
+  if (!ready || syncing || dirty || $('#dlg').open) return; // 有未存變更、或正在編輯對話框時不動，下次切回再讀
+  syncing = true;
+  try {
+    await flushChain;
+    if (dirty) return;
+    const r = await fetch('/store'); if (!r.ok) return;
+    const files = (await r.json()).files || {};
+    if (dirty || sameFiles(files, diskSnapshot)) return; // 磁碟沒有變化就什麼都不做（不會清掉你的回應結果）
+    const x = fromFiles(files);
+    S.colls = x.colls; S.hist = x.hist; diskSnapshot = { ...files };
+    // 開著的分頁：沒有未存修改、且磁碟上的內容和分頁不同，才換成磁碟上的最新內容
+    const byId = new Map(S.colls.flatMap((c) => c.items.map((i) => [i.id, i])));
+    S.tabs = S.tabs.map((t) => { const it = byId.get(t.id); return it && !t.dirty && toCurlFile(t) !== toCurlFile(it) ? { ...blank(), ...JSON.parse(JSON.stringify(it)), res: null } : t; });
+    baseline = buildFiles();
+    renderSide(); renderTabs(); renderReq(); renderRes();
+    const n = S.colls.reduce((a, c) => a + c.items.length, 0);
+    const el = $('#saved'); el.style.color = ''; el.textContent = `🔄 已重新讀取資料夾（${S.colls.length} 個集合、${n} 個請求）`;
+    setTimeout(() => { if (!dirty) setSaved('ok'); }, 3500);
+  } catch { /* 讀取失敗就保持現狀，下次切回再試 */ }
+  finally { syncing = false; }
+}
+const scheduleSync = () => { clearTimeout(syncTimer); syncTimer = setTimeout(syncFromDisk, 250); };
+window.addEventListener('focus', scheduleSync);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleSync(); });
+
 boot();
 </script>
 </body>
