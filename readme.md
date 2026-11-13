@@ -19,7 +19,7 @@ npm run cli           # 或 mock / tester
 
 ## 注意事項
 
-- `mock-server/.env`（上游網址）、`api-tester/data/`（token、密碼）都已被各自的 `.gitignore` 排除，請勿 `git add -f`
+- `mock-server/.env`（上游網址）、`api-tester/test-data/`（token、密碼、請求 curl）都已被各自的 `.gitignore` 排除，請勿 `git add -f`
 - `mock-server` 只有共用程式與 `_example` 範例進版控；真實 API handler、錄製資料、`projects` 設定都不進版控（見 `mock-server/.env.example`）
 - 舊的獨立 `mock-server` repo 歷史（含錄製資料）刻意**沒有**併入，請勿把它 merge 進來
 - VSCode 任務與快捷鍵（`Cmd+1`、`Cmd+6`）見 `.vscode/tasks.json`，路徑已指向 `toolkit-cli/`
