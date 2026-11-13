@@ -66,7 +66,5 @@ reload-trigger
 # ---- 私有資料：真實 API handler / 錄製 / 專案設定都不進版控，只保留 _example ----
 /src/mocks/*
 !/src/mocks/_example/
-!/src/mocks/_example/**/latest.json
 .env.*
 !.env.example
-/src/config/projects.local.ts
