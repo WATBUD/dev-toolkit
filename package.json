@@ -1,0 +1,15 @@
+{
+  "name": "dev-toolkit",
+  "version": "2.0.0",
+  "private": true,
+  "description": "開發工具集合（多專案）：toolkit-cli / mock-server / api-tester。各專案獨立，有各自的 package.json 與依賴。",
+  "scripts": {
+    "cli": "npm --prefix toolkit-cli start",
+    "check-domains": "npm --prefix toolkit-cli run check-domains",
+    "proxy": "npm --prefix toolkit-cli run proxy",
+    "mock": "npm --prefix mock-server run dev",
+    "tester": "npm --prefix api-tester start",
+    "install:all": "npm --prefix toolkit-cli install && npm --prefix mock-server install"
+  },
+  "license": "MIT"
+}
