@@ -17,7 +17,7 @@ button:hover{border-color:var(--pri)} button.pri{background:var(--pri);color:#ff
 button.ghost{border:none;background:none;color:var(--mut);padding:2px 6px} button.ghost:hover{color:var(--bad)}
 header{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--bd);background:var(--card)}
 header h1{font-size:14px;margin:0;white-space:nowrap}
-#app{flex:1;min-height:0;display:grid;grid-template-columns:260px 1fr}
+#app{flex:1;min-height:0;display:grid;grid-template-columns:310px 1fr}
 @media(max-width:760px){#app{grid-template-columns:1fr}#side{display:none}}
 #side{border-right:1px solid var(--bd);background:var(--card);display:flex;flex-direction:column;min-height:0}
 .stabs,.tabs{display:flex;gap:2px;border-bottom:1px solid var(--bd)}
@@ -28,9 +28,25 @@ header h1{font-size:14px;margin:0;white-space:nowrap}
 .item:hover{background:var(--code)} .item .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mt{font:700 10px ui-monospace,monospace;min-width:38px;text-align:center}
 .GET{color:var(--ok)}.POST{color:var(--warn)}.PUT{color:var(--pri)}.PATCH{color:#7c3aed}.DELETE{color:var(--bad)}
-.coll{margin-bottom:6px}.coll>.ch{display:flex;align-items:center;gap:4px;font-weight:600;padding:3px 2px}.coll>.ch span{flex:1}
+.coll{margin-bottom:6px}.coll>.ch{display:flex;align-items:center;gap:4px;font-weight:600;padding:3px 2px}.coll>.ch{cursor:pointer;user-select:none;border-radius:6px}.coll>.ch:hover{background:var(--code)}.coll>.ch>.cn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.coll>.ch .ghost{padding:2px 3px}.coll>.ch>.tw{width:12px;color:var(--mut);font-size:11px}
 #work[hidden],.empty[hidden]{display:none!important}
 .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--mut)}
+.steps{flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
+.step{padding:2px 8px;font-size:12px}.step.on{border-color:var(--pri);background:var(--hl)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+.log{width:100%;border-collapse:collapse;font-size:12px}
+.log td{padding:3px 4px;border-bottom:1px solid var(--bd);white-space:nowrap;cursor:pointer;word-break:normal}
+.log td.ln{width:100%;max-width:0;overflow:hidden;text-overflow:ellipsis}
+.log tr:hover td{background:var(--code)}.log tr.on td{background:var(--hl)}
+.log tr.sep td{border-bottom:2px solid var(--bd);padding:0;cursor:default}
+.vmenu{position:fixed;z-index:50;width:320px;max-height:300px;overflow:auto;background:var(--card);border:1px solid var(--bd);border-radius:8px;box-shadow:0 6px 20px #0003}
+.vmenu[hidden]{display:none}
+.vm{padding:6px 10px;cursor:pointer;display:flex;flex-direction:column;gap:2px}.vm:hover{background:var(--hl)}.vm .hint{word-break:break-all}
+.vpick{font:600 11px ui-monospace,monospace;color:var(--pri)!important;padding:2px 4px}
+.envbtn{font-size:11px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sortbtn{min-width:26px}.sortbtn.on{color:var(--pri)!important;font-weight:700}
+.item[draggable=true]{cursor:grab}.item.dragging{opacity:.4}
+.item.drop-before{box-shadow:inset 0 2px 0 var(--pri)}.item.drop-after{box-shadow:inset 0 -2px 0 var(--pri)}
+.grip{color:var(--mut);font-size:10px;letter-spacing:-2px;opacity:.5}.item:hover .grip{opacity:1}
 .var{border:1px solid var(--bd);border-radius:6px;padding:6px 8px;margin-bottom:6px}
 .vval{font:12px/1.4 ui-monospace,Menlo,monospace;word-break:break-all;margin:2px 0}
 .vsec{font-weight:600;font-size:12px;color:var(--mut);margin:10px 0 6px}
@@ -43,7 +59,7 @@ header h1{font-size:14px;margin:0;white-space:nowrap}
 #req,#res{background:var(--card);border:1px solid var(--bd);border-radius:8px;display:flex;flex-direction:column;min-height:0}
 #req{flex:0 0 auto;max-height:46%} #res{flex:1}
 .pane{padding:8px;overflow:auto;min-height:90px}
-.kv{display:grid;grid-template-columns:22px 1fr 1fr 24px;gap:4px;margin-bottom:4px;align-items:center}
+.kv{display:grid;grid-template-columns:22px 1fr 1fr auto 24px;gap:4px;margin-bottom:4px;align-items:center}
 .kv input[type=checkbox]{width:auto}
 .hint{color:var(--mut);font-size:12px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -65,14 +81,11 @@ table{border-collapse:collapse;width:100%}td{border-bottom:1px solid var(--bd);p
   <span class="hint">請求由本機 server 代發，無 CORS 限制</span>
   <span class="hint" id="saved"></span>
   <span style="flex:1"></span>
-  <label class="hint">環境</label>
-  <select id="envsel" style="width:160px"></select>
-  <button id="envedit">編輯</button>
   <button id="btn-import">匯入 curl</button>
 </header>
 <div id="app">
   <aside id="side">
-    <div class="stabs"><button data-s="coll" class="on">集合</button><button data-s="hist">歷史</button><button data-s="vars">變數</button></div>
+    <div class="stabs"><button data-s="coll" class="on">集合</button><button data-s="hist">歷史</button><button data-s="vars">變數</button><button data-s="log">日誌</button></div>
     <div class="sbody" id="sbody"></div>
   </aside>
   <div id="main">
@@ -105,6 +118,8 @@ table{border-collapse:collapse;width:100%}td{border-bottom:1px solid var(--bd);p
 
 <dialog id="dlg"><form method="dialog" id="dform"></form></dialog>
 
+<datalist id="vars-dl"></datalist>
+<div id="vmenu" class="vmenu" hidden></div>
 <script>
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -114,7 +129,7 @@ const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 const blank = () => ({ id: uid(), name: '', method: 'GET', url: '', params: [], headers: [], bodyType: 'none', body: '', form: [], auth: { type: 'none', token: '', user: '', pass: '' }, extract: [], next: '', collId: '', dirty: false, res: null });
 const S = {
   tabs: [], active: null, colls: [], hist: [], envs: [], env: '',
-  side: 'coll', reqTab: 'params', resTab: 'body', pretty: true,
+  side: 'coll', reqTab: 'params', resTab: 'body', pretty: true, showSec: true, // showSec：「請求」分頁預設顯示機密原值，可取消勾選改成遮罩
 };
 const cur = () => S.tabs.find((t) => t.id === S.active);
 // ---- 持久化：存到 server 的 test-data/ 資料夾（每個使用者本機自己產生，不進版控）----
@@ -152,7 +167,15 @@ window.addEventListener('pagehide', () => flush(true));
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(true); });
 
 /* ---------- 變數 ---------- */
-const vars = () => Object.fromEntries(((S.envs.find((e) => e.id === S.env) || {}).vars || []).filter((v) => v.on !== false && v.k).map((v) => [v.k, v.v]));
+// 每個集合有自己的環境（_collection.json 的 env → environments.json 裡的某個環境）。
+// 送出時用「該請求所屬集合」的環境；不在集合裡的分頁才用全域 S.env。
+let ctxT = null; // 正在送出的請求：送出期間的變數代入與 Extract 都以它的集合為準
+const collOf = (t) => (t && t.collId ? S.colls.find((c) => c.id === t.collId) : null);
+// 串接 / 自動取公鑰 / 自動重登要執行集合裡的某個請求時：若它有開著的分頁，就用分頁裡「你現在看到的版本」（含未儲存的修改）
+const liveReq = (item) => { const tab = S.tabs.find((x) => x.id === item.id); const r = JSON.parse(JSON.stringify(tab ? { ...strip(tab), collId: item.collId || tab.collId } : item)); if (tab && tab.dirty) r.__unsaved = true; return r; };
+const envIdFor = (t) => { const co = collOf(t); return co ? co.env : S.env; };
+const curEnv = () => S.envs.find((e) => e.id === envIdFor(ctxT || cur()));
+const vars = () => Object.fromEntries(((curEnv() || {}).vars || []).filter((v) => v.on !== false && v.k).map((v) => [v.k, v.v]));
 const sub = (s) => { const v = vars(); let out = String(s ?? ''); for (let i = 0; i < 3; i++) { const n = out.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (m, k) => (k in v ? v[k] : m)); if (n === out) break; out = n; } return out; };
 
 /* ---------- URL <-> params ---------- */
@@ -234,7 +257,8 @@ async function resolveDynamic(r) {
   const re = (x) => (typeof x === 'string' ? x.replace(RSA_RE, (m, n) => out[n]) : x);
   r.url = re(r.url); r.body = re(r.body); for (const k in r.headers) r.headers[k] = re(r.headers[k]);
 }
-async function doSend(t) {
+async function doSend(t) { const prev = ctxT; ctxT = t; try { return await doSendInner(t); } finally { ctxT = prev; } }
+async function doSendInner(t) {
   const r = build(t);
   if (!r.url) return { error: '請輸入 URL' };
   if (!/^https?:\/\//i.test(r.url)) r.url = 'http://' + r.url;
@@ -242,30 +266,45 @@ async function doSend(t) {
   const needsKey = [r.url, r.body, ...Object.values(r.headers)].some((x) => new RegExp(RSA_RE.source).test(String(x ?? '')));
   if (needsKey && !String(vars().publicKey || '').trim() && /\{\{/.test(sub('{{rsaKeyUrl}}'))) {
     const co = S.colls.find((c) => c.id === t.collId);
-    const pv = co && co.items.find((i) => i.id !== t.id && (i.extract || []).some((x) => x.on !== false && String(x.v).trim() === 'publicKey'));
+    const pv = co && co.items.map(liveReq).find((i) => i.id !== t.id && (i.extract || []).some((x) => x.on !== false && String(x.v).trim() === 'publicKey'));
     if (pv) {
       autoKey = pv.name || pv.url;
-      const tmp = JSON.parse(JSON.stringify(pv)); const pres = await doSend(tmp); applyExtract(tmp, pres);
+      const tmp = JSON.parse(JSON.stringify(pv)); const pres = await doSend(tmp); applyExtract(tmp, pres); logRes(tmp, pres, 'key');
       if (pres.error || pres.status >= 400 || !String(vars().publicKey || '').trim())
         return { error: `自動執行「${autoKey}」取得公鑰失敗` + (pres.error ? '：' + pres.error : pres.status >= 400 ? `（HTTP ${pres.status}）` : '（回應裡找不到要擷取成 publicKey 的欄位）') };
     }
   }
-  try { await resolveDynamic(r); } catch (e) { return { error: e.message }; }
-  try { const res = await proxy({ ...r, timeoutMs: 30000 }); if (autoKey) res.autoKey = autoKey; return res; } catch (e) { return { error: String(e) }; }
+  try { await resolveDynamic(r); } catch (e) { return { error: e.message, req: { method: r.method, url: r.url, headers: r.headers, body: r.body } }; }
+  try {
+    const res = await proxy({ ...r, timeoutMs: 30000 });
+    // 實際送出的請求：{{變數}} 已代入、{{$rsa()}} 已加密；Header 以 server 實際發出的為準（含自動補上的 User-Agent）
+    res.req = { method: r.method, url: (res.sent && res.sent.url) || r.url, headers: (res.sent && res.sent.headers) || r.headers, body: r.body }; delete res.sent;
+    if (autoKey) res.autoKey = autoKey; return res;
+  } catch (e) { return { error: String(e), req: { method: r.method, url: r.url, headers: r.headers, body: r.body } }; }
+}
+// 回應日誌：每次實際發出的請求（含自動取公鑰、接著執行、自動重登）都記一筆。
+// 只放在記憶體，重新整理就清空：回應裡可能有 token，不寫到磁碟。
+const RLOG = []; let runSeq = 0, curRun = 0;
+function logRes(t, res, kind) {
+  RLOG.unshift({ id: uid(), run: curRun, at: Date.now(), kind, name: t.name || '', method: t.method, url: t.url, res });
+  if (RLOG.length > 200) RLOG.length = 200;
 }
 function getPath(o, path) {
   const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
+  // 欄位名先精確比對，找不到再不分大小寫（accessToken 也能找到 AccessToken）
+  const pick = (x, k) => { if (k in x) return x[k]; const kk = Object.keys(x).find((n) => n.toLowerCase() === k.toLowerCase()); return kk === undefined ? undefined : x[kk]; };
   let v = o;
-  for (const p of parts) { if (v == null || typeof v !== 'object') { v = undefined; break; } v = v[p]; }
+  for (const p of parts) { if (v == null || typeof v !== 'object') { v = undefined; break; } v = pick(v, p); }
   if (v === undefined && parts.length === 1) { // 單一欄位名：往下找
-    const find = (x, d = 0) => { if (!x || typeof x !== 'object' || d > 5) return; if (parts[0] in x) return x[parts[0]]; for (const c of Object.values(x)) { const r = find(c, d + 1); if (r !== undefined) return r; } };
+    const find = (x, d = 0) => { if (!x || typeof x !== 'object' || d > 5) return; const hit = pick(x, parts[0]); if (hit !== undefined) return hit; for (const c of Object.values(x)) { const r = find(c, d + 1); if (r !== undefined) return r; } };
     v = find(o);
   }
   return v;
 }
-function setVar(k, v, src) {
-  let env = S.envs.find((e) => e.id === S.env);
-  if (!env) { env = { id: uid(), name: '預設', vars: [] }; S.envs.push(env); S.env = env.id; }
+function setVar(k, v, src, t) {
+  const co = collOf(t || ctxT || cur());
+  let env = S.envs.find((e) => e.id === (co ? co.env : S.env));
+  if (!env) { env = { id: uid(), name: co ? co.name : '預設', vars: [] }; S.envs.push(env); if (co) co.env = env.id; else S.env = env.id; }
   const ex = env.vars.find((x) => x.k === k);
   const meta = src ? { src, at: Date.now() } : {}; // src / at：由哪個請求的 Extract、何時存進來（顯示在左側「變數」分頁）
   if (ex) Object.assign(ex, { v }, meta); else env.vars.push({ on: true, k, v, secret: /token|pass|secret/i.test(k), ...meta });
@@ -278,32 +317,32 @@ function applyExtract(t, res) {
   for (const x of rules) {
     const v = getPath(j, x.k.trim());
     if (v === undefined || v === null) res.missing.push(x.k);
-    else { setVar(x.v.trim(), typeof v === 'string' ? v : JSON.stringify(v), t.name || t.url); res.extracted.push(x.v.trim()); }
+    else { setVar(x.v.trim(), typeof v === 'string' ? v : JSON.stringify(v), t.name || t.url, t); res.extracted.push(x.v.trim()); }
   }
 }
 async function runLogin(collId) {
   const co = S.colls.find((c) => c.id === collId);
-  const li = co && co.cfg && co.cfg.loginId && co.items.find((i) => i.id === co.cfg.loginId);
+  const li0 = co && co.cfg && co.cfg.loginId && co.items.find((i) => i.id === co.cfg.loginId); const li = li0 && liveReq(li0);
   if (!li) return { ok: false };
   const tmp = JSON.parse(JSON.stringify(li));
-  const res = await doSend(tmp); applyExtract(tmp, res);
+  const res = await doSend(tmp); applyExtract(tmp, res); logRes(tmp, res, 'relogin');
   return { ok: !res.error && res.status >= 200 && res.status < 300 && !(res.missing || []).length, res };
 }
 // 送出 → 擷取變數 → 若 401 且用「集合共用」auth，自動重登一次再重送
 async function execute(t, depth = 0) {
-  let res = await doSend(t); applyExtract(t, res);
+  let res = await doSend(t); applyExtract(t, res); logRes(t, res, depth ? 'next' : 'main');
   if (!res.error && res.status === 401 && t.auth.type === 'coll' && t.collId) {
     const lg = await runLogin(t.collId);
-    if (lg.ok) { res = await doSend(t); applyExtract(t, res); res.relogin = true; } else res.reloginFailed = true;
+    if (lg.ok) { res = await doSend(t); applyExtract(t, res); res.relogin = true; logRes(t, res, 'retry'); } else res.reloginFailed = true;
   }
   // 成功（且 Extract 都有取到）後，接著執行同集合裡指定的請求；最多串 5 層避免循環
   if (t.next && depth < 5 && !res.error && res.status < 400 && !(res.missing || []).length) {
     const co = S.colls.find((c) => c.id === t.collId);
-    const nx = co && co.items.find((i) => (i.name || '') === t.next && i.id !== t.id);
+    const nx = co && co.items.map(liveReq).find((i) => (i.name || '') === t.next && i.id !== t.id);
     if (!nx) res.chain = [{ name: t.next, error: '找不到這個請求（要在同一個集合裡）' }];
     else {
       const nr = await execute({ ...JSON.parse(JSON.stringify(nx)), collId: co.id }, depth + 1);
-      res.chain = [{ name: t.next, status: nr.status, error: nr.error, extracted: nr.extracted, missing: nr.missing, autoKey: nr.autoKey }, ...(nr.chain || [])];
+      res.chain = [{ name: t.next, status: nr.status, error: nr.error, extracted: nr.extracted, missing: nr.missing, autoKey: nr.autoKey, unsaved: !!nx.__unsaved, res: nr }, ...(nr.chain || [])];
     }
   }
   return res;
@@ -316,10 +355,11 @@ const badges = (r) =>
   (r.autoKey ? `<span class="hint">🔑 已先執行「${esc(r.autoKey)}」取得公鑰</span>` : '') +
   (r.chain || []).map((c) => c.error
     ? `<span style="color:var(--bad)">→ ${esc(c.name)}：${esc(c.error)}</span>`
-    : `<span class="hint">→ ${esc(c.name)} <b style="color:${c.status < 400 ? 'var(--ok)' : 'var(--bad)'}">${c.status}</b>${c.extracted && c.extracted.length ? ' ✔ 已擷取 ' + c.extracted.map(esc).join('、') : ''}${c.missing && c.missing.length ? ' ⚠ 找不到 ' + c.missing.map(esc).join('、') : ''}</span>`).join('');
+    : `<span class="hint">→ ${esc(c.name)}${c.unsaved ? ' <span title="這一步用的是分頁裡尚未儲存的版本">（分頁未儲存版本）</span>' : ''} <b style="color:${c.status < 400 ? 'var(--ok)' : 'var(--bad)'}">${c.status}</b>${c.extracted && c.extracted.length ? ' ✔ 已擷取 ' + c.extracted.map(esc).join('、') : ''}${c.missing && c.missing.length ? ' ⚠ 找不到 ' + c.missing.map(esc).join('、') : ''}</span>`).join('');
 
 async function sendReq() {
   const t = cur(); if (!t) return;
+  curRun = ++runSeq; S.resStep = 0; S.logView = null;
   t.res = { loading: true }; renderRes();
   const res = await execute(t); t.res = res;
   if (!res.error) {
@@ -341,7 +381,7 @@ function renderTabs() {
 $('#rtabs').onclick = (e) => {
   const c = e.target.closest('[data-close]'); if (c) { closeTab(c.dataset.close); return; }
   if (e.target.closest('#newtab')) return newTab();
-  const r = e.target.closest('.rt[data-id]'); if (r) { S.active = r.dataset.id; all(); }
+  const r = e.target.closest('.rt[data-id]'); if (r) { S.active = r.dataset.id; S.resStep = 0; S.logView = null; all(); }
 };
 function newTab() { const t = blank(); S.tabs.push(t); S.active = t.id; all(); }
 $('#empty-new').onclick = newTab;
@@ -350,9 +390,51 @@ function closeTab(id) { S.tabs = S.tabs.filter((t) => t.id !== id); if (!S.tabs.
 /* ---------- 渲染：請求區 ---------- */
 const REQTABS = [['params', 'Params'], ['headers', 'Headers'], ['body', 'Body'], ['auth', 'Auth'], ['extract', 'Extract']];
 function kvEditor(arr, key, ph) {
-  return arr.map((p, i) => `<div class="kv"><input type="checkbox" data-kv="${key}.${i}.on" ${p.on !== false ? 'checked' : ''}><input data-kv="${key}.${i}.k" value="${esc(p.k)}" placeholder="${ph[0]}" spellcheck="false"><input data-kv="${key}.${i}.v" value="${esc(p.v)}" placeholder="${ph[1]}" spellcheck="false"><button class="ghost" data-del="${key}.${i}">✕</button></div>`).join('') + `<button data-add="${key}">＋ 新增</button>`;
+  return arr.map((p, i) => `<div class="kv"><input type="checkbox" data-kv="${key}.${i}.on" ${p.on !== false ? 'checked' : ''}><input data-kv="${key}.${i}.k" value="${esc(p.k)}" placeholder="${ph[0]}" spellcheck="false"><input data-kv="${key}.${i}.v" value="${esc(p.v)}" placeholder="${ph[1]}" spellcheck="false"${key === 'extract' ? '' : ' list="vars-dl"'}>${key === 'extract' ? '<span></span>' : `<button class="ghost vpick" data-pick="${key}.${i}" title="選擇已儲存的變數">{x}</button>`}<button class="ghost" data-del="${key}.${i}">✕</button></div>`).join('') + `<button data-add="${key}">＋ 新增</button>`;
 }
+/* ---------- 選擇已儲存的變數（Header / Params / Form 的值、Bearer token）---------- */
+// 機密判斷：勾了 🔒，或名稱看起來就是機密（password、token、cookie…），一律遮罩顯示
+const isSecret = (v) => !!v.secret || /pass|pwd|token|secret|cookie|auth|session/i.test(v.k || '');
+const envVarsList = () => { const env = curEnv(); return env ? env.vars.filter((v) => v.k && v.on !== false) : []; };
+function refreshVarList() { const dl = $('#vars-dl'); if (dl) dl.innerHTML = envVarsList().map((v) => `<option value="{{${esc(v.k)}}}">${esc(v.k)}${isSecret(v) ? ' 🔒' : ''}</option>`).join(''); }
+let pickTarget = null;
+function openVarMenu(btn) {
+  const input = btn.parentElement.querySelector('input[data-kv$=".v"]'); if (!input) return;
+  pickTarget = { input, kv: input.dataset.kv };
+  const vs = envVarsList(), m = $('#vmenu');
+  m.innerHTML = vs.length ? vs.map((v) => {
+    const val = String(v.v ?? ''), pv = isSecret(v) ? '•'.repeat(Math.min(val.length, 12)) : val.slice(0, 40) + (val.length > 40 ? '…' : '');
+    return `<div class="vm" data-var="${esc(v.k)}"><b>{{${esc(v.k)}}}${isSecret(v) ? ' 🔒' : ''}</b><span class="hint">${pv ? esc(pv) : '（空）'}${v.src ? ' · ← ' + esc(v.src) + ' ' + ago(v.at) : ''}</span></div>`;
+  }).join('') : '<div class="hint" style="padding:8px 10px">目前環境沒有變數。送出有 Extract 的請求，或按集合旁的 ✎ 編輯環境。</div>';
+  const r = btn.getBoundingClientRect();
+  m.style.top = Math.min(r.bottom + 4, innerHeight - 120) + 'px'; m.style.left = Math.max(8, Math.min(r.right - 320, innerWidth - 330)) + 'px'; m.hidden = false;
+}
+function applyVar(name) {
+  const { input, kv } = pickTarget || {}; $('#vmenu').hidden = true; if (!input) return;
+  const [k, i] = kv.split('.'); const t = cur(); if (!t || !t[k] || !t[k][+i]) return;
+  const tok = `{{${name}}}`, val = input.value, a = input.selectionStart ?? val.length, b = input.selectionEnd ?? val.length;
+  let nv;
+  if (a !== b) nv = val.slice(0, a) + tok + val.slice(b);              // 有選取一段：只換掉那段
+  else if (!val || (/\s$/.test(val) && a === val.length)) nv = val + tok; // 空的、或像「Bearer 」結尾：接在後面
+  else nv = tok;                                                        // 其他（例如貼上的整串 token）：整個換成變數
+  t[k][+i].v = nv; if (k === 'params') syncUrlFromParams(t);
+  t.dirty = true; persist(); renderReq(); renderTabs();
+}
+document.addEventListener('click', (e) => {
+  const pb = e.target.closest('[data-pick]'); if (pb) return openVarMenu(pb);
+  const it = e.target.closest('#vmenu [data-var]'); if (it) return applyVar(it.dataset.var);
+  const es = e.target.closest('#vmenu [data-envset]'); if (es) { $('#vmenu').hidden = true; const [cid, eid] = es.dataset.envset.split('|'); return setCollEnv(cid, eid); }
+  const en = e.target.closest('#vmenu [data-envnew]'); if (en) {
+    $('#vmenu').hidden = true; const cid = en.dataset.envnew, co = S.colls.find((k) => k.id === cid);
+    const n = prompt('環境名稱（如 dev / stg）', co ? co.name : ''); if (!n) return;
+    const env = { id: uid(), name: n.trim(), vars: [{ on: true, k: 'baseUrl', v: '' }] }; S.envs.push(env); setCollEnv(cid, env.id); return openEnvEditor(env.id);
+  }
+  if (!e.target.closest('#vmenu') && !e.target.closest('[data-envpick],[data-envedit]')) $('#vmenu').hidden = true;
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#vmenu').hidden = true; });
+
 function renderReq() {
+  refreshVarList();
   const t = cur(); if (!t) return;
   $('#method').value = t.method; if ($('#url') !== document.activeElement) $('#url').value = t.url;
   $('#reqtabs').innerHTML = REQTABS.map(([k, n]) => {
@@ -378,7 +460,7 @@ function renderReq() {
       + `<p class="hint">例：取公鑰的請求擷取 <code>data → publicKey</code>，接著執行「Login」；Login 的密碼欄位寫 <code>{{$rsa(password)}}</code> 就會用剛拿到的公鑰加密。${co ? '' : '<br>⚠️ 這個請求還沒存進集合，存進去才能選。'}</p>`;
   } else {
     h = `<div class="row" style="margin-bottom:6px"><select data-f="auth.type" style="width:180px">${[['none', '無'], ['bearer', 'Bearer Token'], ['basic', 'Basic Auth'], ['coll', '集合共用（自動帶 token）']].map(([k, n]) => `<option value="${k}" ${t.auth.type === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`;
-    if (t.auth.type === 'bearer') h += `<input data-f="auth.token" value="${esc(t.auth.token)}" placeholder="token（可用 {{token}}）" spellcheck="false">`;
+    if (t.auth.type === 'bearer') h += `<input data-f="auth.token" value="${esc(t.auth.token)}" placeholder="token（可用 {{token}}）" spellcheck="false" list="vars-dl">`;
     if (t.auth.type === 'coll') h += `<p class="hint">帶入環境變數 <code>{{token}}</code>，header 名稱與前綴看這個請求所屬「集合」的設定（⚙）。收到 401 會自動重跑集合的登入請求並重送一次。${t.collId ? '' : '<br>⚠️ 這個請求還沒存進集合，請先按「儲存」。'}</p>`;
     if (t.auth.type === 'basic') h += `<div class="row"><input data-f="auth.user" value="${esc(t.auth.user)}" placeholder="username" style="flex:1"><input data-f="auth.pass" type="password" value="${esc(t.auth.pass)}" placeholder="password" style="flex:1"></div>`;
   }
@@ -417,19 +499,49 @@ function hlJson(src) {
   }
   return out + esc(src.slice(last));
 }
+// ---- 請求檢視：實際送出的方法、網址、Header、Body。機密預設遮罩，可勾「顯示機密」----
+const SECRET_HEADER = /^(authorization|proxy-authorization|access-token|x-access-token|x-auth-token|x-api-key|api-key|cookie)$/i;
+const secretValues = () => S.envs.flatMap((e) => e.vars).filter((v) => isSecret(v) && String(v.v || '').length >= 6).map((v) => String(v.v)).sort((a, b) => b.length - a.length);
+const maskText = (str) => { let out = String(str ?? ''); if (S.showSec) return out; for (const v of secretValues()) out = out.split(v).join('••••••'); return out; };
+const maskHeader = (k, v) => (S.showSec ? v : SECRET_HEADER.test(k) ? (v ? `••••••（${v.length} 字元）` : '') : maskText(v));
+const reqHeaders = (q) => (Array.isArray(q.headers) ? q.headers : Object.entries(q.headers || {}));
+const reqToCurl = (q) => [`curl -X ${q.method} ${qsh(q.url)}`, ...reqHeaders(q).map(([k, v]) => `-H ${qsh(k + ': ' + v)}`), ...(q.body ? [`--data-raw ${qsh(q.body)}`] : [])].join(' \\\n  ');
+function renderReqView(q) {
+  if (!q) return '<span class="hint">這筆沒有請求資料。</span>';
+  const hs = reqHeaders(q);
+  let bodyHtml = '<span class="hint">（沒有 Body）</span>';
+  if (q.body) { const raw = maskText(q.body); let html = null; try { html = hlJson(JSON.stringify(JSON.parse(raw), null, 2)); } catch {} bodyHtml = `<pre>${html ?? esc(raw)}</pre>`; }
+  return `<div class="row" style="margin-bottom:6px;flex-wrap:nowrap"><b class="mt ${esc(q.method)}" style="min-width:auto">${esc(q.method)}</b><code style="word-break:break-all;flex:1">${esc(maskText(q.url))}</code>`
+    + `<label class="hint" style="white-space:nowrap"><input type="checkbox" id="showsec" ${S.showSec ? 'checked' : ''} style="width:auto"> 顯示機密</label></div>`
+    + `<div class="vsec">Headers（${hs.length}）</div>${hs.length ? `<table>${hs.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(maskHeader(k, String(v)))}</td></tr>`).join('')}</table>` : '<span class="hint">（無）</span>'}`
+    + `<div class="vsec">Body</div>${bodyHtml}`
+    + `<p class="hint">這是實際送出的內容：{{變數}} 已代入、{{$rsa()}} 已加密。</p>`;
+}
+let shownRes = null; // 回應區目前顯示的那一份（本請求 / 串接的某一步 / 日誌中的某一筆）
+const hhmmss = (ts) => new Date(ts).toLocaleTimeString('zh-TW', { hour12: false });
 function renderRes() {
   if (!cur()) return;
-  const r = cur().res, sr = $('#sr'), tabs = $('#restabs'), body = $('#resbody');
-  if (!r) { sr.innerHTML = '<span class="hint">按「送出」查看回應</span>'; tabs.hidden = true; body.innerHTML = ''; return; }
-  if (r.loading) { sr.innerHTML = '<span class="hint">⏳ 請求中…</span>'; tabs.hidden = true; body.innerHTML = ''; return; }
-  if (r.error) { sr.innerHTML = `<span class="pill se">失敗</span><span class="hint">${r.timeMs ?? 0} ms</span>`; tabs.hidden = true; body.innerHTML = `<pre style="color:var(--bad)">${esc(r.error)}</pre>`; return; }
+  const top = cur().res, sr = $('#sr'), tabs = $('#restabs'), body = $('#resbody');
+  const lv = S.logView && RLOG.find((x) => x.id === S.logView);
+  if (S.logView && !lv) S.logView = null;
+  // 有「接著執行」時，可以切換看每一步的完整回應
+  const steps = !lv && top && !top.loading ? [{ label: '本請求', res: top }, ...(top.chain || []).filter((c) => c.res).map((c) => ({ label: '→ ' + c.name, res: c.res }))] : [];
+  if (!(S.resStep < steps.length)) S.resStep = 0;
+  const r = lv ? lv.res : steps.length > 1 ? steps[S.resStep].res : top;
+  shownRes = r;
+  const pre = (lv ? `<div class="steps"><span class="hint">📜 日誌：<b>${esc(lv.name || String(lv.url).replace(/^https?:\/\/[^/]+/, ''))}</b> · ${hhmmss(lv.at)}</span><button id="logback">✕ 回到這個分頁的回應</button></div>` : '')
+    + (steps.length > 1 ? `<div class="steps">${steps.map((st, i) => `<button class="step ${i === S.resStep ? 'on' : ''}" data-step="${i}">${esc(st.label)} <b class="${st.res.error || st.res.status >= 400 ? 'bad' : 'ok'}">${st.res.error ? '✕' : st.res.status}</b></button>`).join('')}</div>` : '');
+  if (!r) { sr.innerHTML = pre + '<span class="hint">按「送出」查看回應</span>'; tabs.hidden = true; body.innerHTML = ''; return; }
+  if (r.loading) { sr.innerHTML = pre + '<span class="hint">⏳ 請求中…</span>'; tabs.hidden = true; body.innerHTML = ''; return; }
+  if (r.error) { sr.innerHTML = pre + `<span class="pill se">失敗</span><span class="hint">${r.timeMs ?? 0} ms</span>${r.req ? '<span style="flex:1"></span><button id="copyres" data-what="req">複製請求 curl</button>' : ''}`; tabs.hidden = true; body.innerHTML = `<pre style="color:var(--bad)">${esc(r.error)}</pre>` + (r.req ? `<div class="vsec">實際送出的請求</div>${renderReqView(r.req)}` : ''); return; }
   const cls = 's' + String(r.status)[0];
-  sr.innerHTML = `<span class="pill ${cls}">${r.status} ${esc(r.statusText)}</span><span>${r.timeMs} ms</span><span>${fmtSize(r.size)}</span>${badges(r)}` +
-    `<span style="flex:1"></span>${lastToken ? `<button id="savetok" title="${esc(lastToken[0])}">token → 存成環境變數</button>` : ''}<button id="copyres">複製回應</button>`;
+  sr.innerHTML = pre + `<span class="pill ${cls}">${r.status} ${esc(r.statusText)}</span><span>${r.timeMs} ms</span><span>${fmtSize(r.size)}</span>${badges(r)}` +
+    `<span style="flex:1"></span>${lastToken ? `<button id="savetok" title="${esc(lastToken[0])}">token → 存成環境變數</button>` : ''}<button id="copyres" data-what="${S.resTab === 'req' ? 'req' : 'res'}">${S.resTab === 'req' ? '複製請求 curl' : '複製回應'}</button>`;
   tabs.hidden = false;
-  tabs.innerHTML = [['body', 'Body'], ['headers', `Headers (${r.headers.length})`], ['cookies', `Cookies (${r.cookies.length})`]].map(([k, n]) => `<button data-t="${k}" class="${S.resTab === k ? 'on' : ''}">${n}</button>`).join('') +
+  tabs.innerHTML = [['req', '⬆ 請求'], ['body', '回應 Body'], ['headers', `回應 Headers (${r.headers.length})`], ['cookies', `Cookies (${r.cookies.length})`]].map(([k, n]) => `<button data-t="${k}" class="${S.resTab === k ? 'on' : ''}">${n}</button>`).join('') +
     (S.resTab === 'body' && r.isText ? `<span style="flex:1"></span><label class="hint" style="padding:6px"><input type="checkbox" id="pretty" ${S.pretty ? 'checked' : ''} style="width:auto"> 格式化</label>` : '');
-  if (S.resTab === 'headers') body.innerHTML = `<table>${r.headers.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>`;
+  if (S.resTab === 'req') body.innerHTML = renderReqView(r.req);
+  else if (S.resTab === 'headers') body.innerHTML = `<table>${r.headers.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>`;
   else if (S.resTab === 'cookies') body.innerHTML = r.cookies.length ? `<table>${r.cookies.map((c) => `<tr><td>Set-Cookie</td><td>${esc(c)}</td></tr>`).join('')}</table>` : '<span class="hint">沒有 Set-Cookie</span>';
   else if (!r.isText) body.innerHTML = /^image\//.test(r.contentType) ? `<img style="max-width:100%" src="data:${esc(r.contentType)};base64,${r.body}">` : `<span class="hint">二進位內容（${esc(r.contentType)}，${fmtSize(r.size)}）</span>`;
   else if (!r.body) body.innerHTML = '<span class="hint">（空回應）</span>';
@@ -437,30 +549,46 @@ function renderRes() {
 }
 $('#sr').onclick = (e) => {
   if (!cur()) return;
-  const r = cur().res;
-  if (e.target.id === 'copyres') navigator.clipboard.writeText(r.body || '').then(() => (e.target.textContent = '已複製 ✓'));
-  if (e.target.id === 'savetok') { const [k, v] = lastToken; let env = S.envs.find((x) => x.id === S.env); if (!env) { env = { id: uid(), name: '預設', vars: [] }; S.envs.push(env); S.env = env.id; } const ex = env.vars.find((x) => x.k === 'token'); ex ? (ex.v = v) : env.vars.push({ on: true, k: 'token', v }); persist(); renderEnv(); e.target.textContent = `已存為 {{token}} ✓`; }
+  const st = e.target.closest('[data-step]'); if (st) { S.resStep = +st.dataset.step; return renderRes(); }
+  if (e.target.id === 'logback') { S.logView = null; renderRes(); return renderSide(); }
+  const r = shownRes || cur().res; if (!r) return;
+  if (e.target.id === 'copyres') { const txt = e.target.dataset.what === 'req' && r.req ? reqToCurl(r.req) : (r.body || ''); navigator.clipboard.writeText(txt).then(() => (e.target.textContent = '已複製 ✓')); }
+  if (e.target.id === 'savetok') { const [k, v] = lastToken; setVar('token', v, '回應中的 ' + k, cur()); persist(); renderEnv(); e.target.textContent = `已存為 {{token}} ✓`; }
 };
 $('#restabs').onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) { S.resTab = b.dataset.t; renderRes(); } };
 $('#restabs').onchange = (e) => { if (e.target.id === 'pretty') { S.pretty = e.target.checked; renderRes(); } };
+$('#resbody').onchange = (e) => { if (e.target.id === 'showsec') { S.showSec = e.target.checked; renderRes(); } };
 
 /* ---------- 側欄 ---------- */
 const revealed = new Set(); // 這次瀏覽中被點開看的機密變數（不存檔，重新整理就恢復遮罩）
 const ago = (ts) => { if (!ts) return ''; const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s} 秒前` : s < 3600 ? `${Math.round(s / 60)} 分鐘前` : s < 86400 ? `${Math.round(s / 3600)} 小時前` : new Date(ts).toLocaleString(); };
+function renderLog() {
+  if (!RLOG.length) return '<span class="hint">還沒有紀錄。每次送出（含自動取公鑰、接著執行、自動重登）都會記在這裡，點一列就能看完整回應。<br>只存在這個頁面，重新整理就清空。</span>';
+  const kind = { main: '', next: '↳ ', key: '🔑 ', relogin: '🔄 ', retry: '↻ ' };
+  const runs = []; const byRun = new Map(); // 新的一輪在上；同一輪內照執行順序
+  for (const e of RLOG) { if (!byRun.has(e.run)) { byRun.set(e.run, []); runs.push(e.run); } byRun.get(e.run).push(e); }
+  const row = (e) => { const ok = !e.res.error && e.res.status < 400 && !(e.res.missing || []).length;
+    return `<tr data-log="${e.id}" class="${S.logView === e.id ? 'on' : ''}"><td class="hint">${hhmmss(e.at)}</td><td class="mt ${e.method}">${e.method}</td>`
+      + `<td class="ln">${kind[e.kind] || ''}${esc(e.name || String(e.url).replace(/^https?:\/\/[^/]+/, ''))}${(e.res.missing || []).length ? ` <span class="bad" title="找不到：${esc(e.res.missing.join('、'))}">⚠</span>` : ''}</td>`
+      + `<td class="${ok ? 'ok' : 'bad'}"><b>${e.res.error ? '✕' : e.res.status}</b></td><td class="hint">${e.res.timeMs ?? ''}ms</td></tr>`; };
+  return `<div class="row" style="margin-bottom:6px"><button id="clrlog">清空日誌</button><span class="hint">${RLOG.length} 筆 · 只在記憶體</span></div>`
+    + `<table class="log">${runs.map((r) => byRun.get(r).slice().reverse().map(row).join('')).join('<tr class="sep"><td colspan="5"></td></tr>')}</table>`
+    + `<p class="hint">↳ 接著執行　🔑 自動取公鑰　🔄 自動重登　↻ 重登後重送</p>`;
+}
 function renderVars() {
-  const env = S.envs.find((e) => e.id === S.env);
-  if (!env) return '<span class="hint">還沒有環境。送出有 Extract 的請求後會自動建立「預設」環境，或在右上角新增。</span>';
+  const env = curEnv(), co = collOf(cur());
+  if (!env) return `<span class="hint">${co ? `集合「${esc(co.name)}」還沒有環境。按集合旁的 🌐 選擇或新增，或送出有 Extract 的請求會自動建立。` : '目前分頁不在任何集合裡。打開集合裡的請求，就會顯示那個集合的環境。'}</span>`;
   const vs = env.vars.filter((v) => v.k);
   const ext = vs.filter((v) => v.src).sort((a, b) => (b.at || 0) - (a.at || 0)), other = vs.filter((v) => !v.src);
   const row = (v) => {
-    const i = env.vars.indexOf(v), show = !v.secret || revealed.has(v.k), val = String(v.v ?? '');
-    return `<div class="var"><div class="row" style="gap:4px;flex-wrap:nowrap"><b style="flex:1;word-break:break-all">${esc(v.k)}${v.secret ? ' 🔒' : ''}${v.on === false ? ' <span class="hint">（停用）</span>' : ''}</b>`
-      + (v.secret ? `<button class="ghost" data-vshow="${i}" title="顯示 / 隱藏">${show ? '🙈' : '👁'}</button>` : '')
+    const i = env.vars.indexOf(v), show = !isSecret(v) || revealed.has(v.k), val = String(v.v ?? '');
+    return `<div class="var"><div class="row" style="gap:4px;flex-wrap:nowrap"><b style="flex:1;word-break:break-all">${esc(v.k)}${isSecret(v) ? ' 🔒' : ''}${v.on === false ? ' <span class="hint">（停用）</span>' : ''}</b>`
+      + (isSecret(v) ? `<button class="ghost" data-vshow="${i}" title="顯示 / 隱藏">${show ? '🙈' : '👁'}</button>` : '')
       + `<button class="ghost" data-vcopy="${i}" title="複製值">📋</button><button class="ghost" data-vdel="${i}" title="刪除這個變數">✕</button></div>`
       + `<div class="vval">${val ? (show ? esc(val.length > 160 ? val.slice(0, 160) + '…' : val) : '•'.repeat(Math.min(val.length, 24))) : '<span class="hint">（空）</span>'}</div>`
       + (v.src ? `<div class="hint">← ${esc(v.src)} 擷取 · ${ago(v.at)}${val ? ` · ${val.length} 字元` : ''}</div>` : '') + '</div>';
   };
-  return `<div class="hint" style="margin-bottom:6px">目前環境：<b>${esc(env.name)}</b>（右上角切換） <button id="vars-edit">編輯</button></div>`
+  return `<div class="hint" style="margin-bottom:6px">目前環境：<b>${esc(env.name)}</b>${co ? `（集合 ${esc(co.name)}）` : ''} <button id="vars-edit">編輯</button></div>`
     + `<div class="vsec">Extract 擷取的值</div>` + (ext.length ? ext.map(row).join('') : '<span class="hint">還沒有。在請求的 Extract 分頁設定規則，送出成功後會出現在這裡。</span>')
     + `<div class="vsec">其他變數</div>` + (other.length ? other.map(row).join('') : '<span class="hint">（無）</span>');
 }
@@ -468,24 +596,54 @@ function renderSide() {
   document.querySelectorAll('.stabs button').forEach((b) => b.classList.toggle('on', b.dataset.s === S.side));
   const sb = $('#sbody');
   if (S.side === 'vars') { sb.innerHTML = renderVars(); return; }
+  if (S.side === 'log') { sb.innerHTML = renderLog(); return; }
   if (S.side === 'hist') {
     sb.innerHTML = (S.hist.length ? `<div class="row" style="margin-bottom:6px"><button id="clrhist">清空歷史</button></div>` : '<span class="hint">還沒有紀錄</span>') +
       S.hist.map((h) => `<div class="item" data-h="${h.id}" title="${esc(h.req.url)}"><span class="mt ${h.req.method}">${h.req.method}</span><span class="n">${esc(h.req.url.replace(/^https?:\/\//, ''))}</span><span class="hint">${h.status}</span></div>`).join('');
   } else {
     sb.innerHTML = `<div class="row" style="margin-bottom:6px"><button id="newcoll">＋ 新集合</button><button id="expall">匯出</button><button id="impall">匯入</button></div>` +
       (S.colls.length ? '' : '<span class="hint">按「儲存」把請求放進集合</span>') +
-      S.colls.map((c) => `<div class="coll"><div class="ch"><span>📁 ${esc(c.name)}</span><button class="ghost" data-run="${c.id}" title="依序執行整個集合">▶</button><button class="ghost" data-rc="${c.id}" title="集合設定">⚙</button><button class="ghost" data-dc="${c.id}" title="刪除集合">✕</button></div>` +
-        c.items.map((it) => `<div class="item" data-i="${c.id}|${it.id}"><span class="mt ${it.method}">${it.method}</span><span class="n">${esc(it.name || it.url)}</span><button class="ghost" data-di="${c.id}|${it.id}">✕</button></div>`).join('') + '</div>').join('');
+      S.colls.map((c) => `<div class="coll"><div class="ch" data-toggle="${c.id}" title="點擊展開 / 收合"><span class="tw">${c.collapsed ? '▸' : '▾'}</span><span class="cn">${c.collapsed ? '📁' : '📂'} ${esc(c.name)} <span class="hint">${c.items.length}</span></span><button class="ghost sortbtn ${c.sort === 'asc' || c.sort === 'desc' ? 'on' : ''}" data-sort="${c.id}" title="${({ asc: '目前 A→Z，再按改成 Z→A', desc: '目前 Z→A，再按還原原本順序' })[c.sort] || '依名稱排序（A→Z）'}">${({ asc: 'A↓', desc: 'A↑' })[c.sort] || 'A⇅'}</button><button class="ghost envbtn" data-envpick="${c.id}" title="這個集合用的環境（點擊切換 / 新增）">🌐 ${esc((S.envs.find((e) => e.id === c.env) || {}).name || '無環境')}</button><button class="ghost" data-envedit="${c.id}" title="編輯這個集合的環境">✎</button><button class="ghost" data-rc="${c.id}" title="集合設定">⚙</button><button class="ghost" data-dc="${c.id}" title="刪除集合">✕</button></div>` +
+        (c.collapsed ? '' : c.items.map((it) => `<div class="item" draggable="true" data-dnd="${c.id}|${it.id}" data-i="${c.id}|${it.id}" title="拖曳可調整順序"><span class="grip">⋮⋮</span><span class="mt ${it.method}">${it.method}</span><span class="n">${esc(it.name || it.url)}</span><button class="ghost" data-di="${c.id}|${it.id}">✕</button></div>`).join('')) + '</div>').join('');
   }
 }
 document.querySelector('.stabs').onclick = (e) => { const b = e.target.closest('[data-s]'); if (b) { S.side = b.dataset.s; renderSide(); } };
+// 拖曳排序：只在同一個集合內移動；放在目標的上半部 = 插到它前面，下半部 = 插到它後面
+let dragInfo = null;
+(() => {
+  const sb = $('#sbody');
+  const clear = () => sb.querySelectorAll('.drop-before,.drop-after').forEach((n) => n.classList.remove('drop-before', 'drop-after'));
+  sb.addEventListener('dragstart', (e) => {
+    const it = e.target.closest('.item[data-dnd]'); if (!it) return;
+    const [c, i] = it.dataset.dnd.split('|'); dragInfo = { c, i }; it.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', i); } catch {}
+  });
+  sb.addEventListener('dragend', () => { dragInfo = null; clear(); sb.querySelectorAll('.dragging').forEach((n) => n.classList.remove('dragging')); });
+  sb.addEventListener('dragover', (e) => {
+    const it = e.target.closest('.item[data-dnd]'); if (!it || !dragInfo || it.dataset.dnd.split('|')[0] !== dragInfo.c) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    const r = it.getBoundingClientRect(); clear(); it.classList.add(e.clientY > r.top + r.height / 2 ? 'drop-after' : 'drop-before');
+  });
+  sb.addEventListener('drop', (e) => {
+    const it = e.target.closest('.item[data-dnd]'); if (!it || !dragInfo) return;
+    e.preventDefault(); clear();
+    const [c, tid] = it.dataset.dnd.split('|'); if (c !== dragInfo.c || tid === dragInfo.i) return;
+    const co = S.colls.find((k) => k.id === c); if (!co) return;
+    const from = co.items.findIndex((k) => k.id === dragInfo.i); if (from < 0) return;
+    const [moved] = co.items.splice(from, 1);
+    let to = co.items.findIndex((k) => k.id === tid); const r = it.getBoundingClientRect(); if (e.clientY > r.top + r.height / 2) to++;
+    co.items.splice(to, 0, moved); co.sort = undefined; co.manual = undefined; persist(); renderSide();
+  });
+})();
 const open = (req) => { const ex = S.tabs.find((t) => t.id === req.id); if (ex) { S.active = ex.id; } else { S.tabs.push({ ...JSON.parse(JSON.stringify(req)), dirty: false, res: null }); S.active = req.id; } all(); };
 $('#sbody').onclick = (e) => {
   const g = (k) => e.target.closest(`[${k}]`);
-  if (e.target.id === 'vars-edit') return $('#envedit').click();
+  if (e.target.id === 'vars-edit') return openEnvEditor(envIdFor(cur()));
+  if (e.target.id === 'clrlog') { RLOG.length = 0; S.logView = null; renderRes(); return renderSide(); }
+  const lr = e.target.closest('[data-log]'); if (lr) { S.logView = lr.dataset.log; renderRes(); return renderSide(); }
   const vb = e.target.closest('[data-vshow],[data-vcopy],[data-vdel]');
   if (vb) {
-    const env = S.envs.find((en) => en.id === S.env); const v = env && env.vars[+(vb.dataset.vshow ?? vb.dataset.vcopy ?? vb.dataset.vdel)];
+    const env = curEnv(); const v = env && env.vars[+(vb.dataset.vshow ?? vb.dataset.vcopy ?? vb.dataset.vdel)];
     if (!v) return;
     if (vb.dataset.vshow != null) { revealed.has(v.k) ? revealed.delete(v.k) : revealed.add(v.k); return renderSide(); }
     if (vb.dataset.vcopy != null) { navigator.clipboard.writeText(String(v.v ?? '')).then(() => { vb.textContent = '✓'; setTimeout(renderSide, 900); }); return; }
@@ -494,18 +652,32 @@ $('#sbody').onclick = (e) => {
   }
   if (e.target.id === 'clrhist') { S.hist = []; persist(); return renderSide(); }
   if (e.target.id === 'newcoll') { const n = prompt('集合名稱'); if (n) { S.colls.push({ id: uid(), name: n, items: [] }); persist(); renderSide(); } return; }
-  if (e.target.id === 'expall') return download('api-tester-collections.json', JSON.stringify({ colls: S.colls, envs: S.envs.map((en) => ({ ...en, vars: en.vars.map((v) => (v.secret ? { ...v, v: '' } : v)) })) }, null, 2));
+  if (e.target.id === 'expall') return download('api-tester-collections.json', JSON.stringify({ colls: S.colls, envs: S.envs.map((en) => ({ ...en, vars: en.vars.map((v) => (isSecret(v) ? { ...v, v: '' } : v)) })) }, null, 2));
   if (e.target.id === 'impall') return importFile();
   let x;
+  if ((x = g('data-sort'))) {
+    const co = S.colls.find((k) => k.id === x.dataset.sort); if (!co) return;
+    const key = (i) => String(i.name || i.url || ''); const cmp = (a, b) => key(a).localeCompare(key(b), undefined, { numeric: true, sensitivity: 'base' });
+    if (co.sort === 'asc') { co.sort = 'desc'; co.items.sort((a, b) => -cmp(a, b)); }
+    else if (co.sort === 'desc') { // 第三下：還原成排序前的順序（新加進來、不在記錄裡的排最後，維持目前相對順序）
+      const idx = new Map((co.manual || []).map((id, i) => [id, i])); const at = (i) => (idx.has(i.id) ? idx.get(i.id) : 1e9);
+      co.items.sort((a, b) => at(a) - at(b)); co.sort = undefined; co.manual = undefined;
+    } else { co.manual = co.items.map((i) => i.id); co.sort = 'asc'; co.items.sort(cmp); } // 第一下：先記住原本順序
+    persist(); return renderSide();
+  }
+  if ((x = g('data-envpick'))) return openEnvMenu(x);
+  if ((x = g('data-envedit'))) { const co = S.colls.find((k) => k.id === x.dataset.envedit); if (!co) return; if (!co.env) return openEnvMenu(x.previousElementSibling); return openEnvEditor(co.env); }
+  if ((x = g('data-toggle')) && !e.target.closest('button')) {
+    const co = S.colls.find((k) => k.id === x.dataset.toggle); if (co) { co.collapsed = !co.collapsed || undefined; persist(); renderSide(); } return;
+  }
   if ((x = g('data-di'))) { const [c, i] = x.dataset.di.split('|'); const co = S.colls.find((k) => k.id === c); co.items = co.items.filter((k) => k.id !== i); persist(); return renderSide(); }
   if ((x = g('data-dc'))) { if (confirm('刪除整個集合？')) { S.colls = S.colls.filter((k) => k.id !== x.dataset.dc); persist(); renderSide(); } return; }
   if ((x = g('data-rc'))) return openCollCfg(x.dataset.rc);
-  if ((x = g('data-run'))) return runCollection(x.dataset.run);
   if ((x = g('data-i'))) { const [c, i] = x.dataset.i.split('|'); return open(S.colls.find((k) => k.id === c).items.find((k) => k.id === i)); }
   if ((x = g('data-h'))) { const h = S.hist.find((k) => k.id === x.dataset.h); return open({ ...h.req, id: uid() }); }
 };
 
-/* ---------- 集合設定 / Runner / 範本 ---------- */
+/* ---------- 集合設定 ---------- */
 function openCollCfg(id) {
   const co = S.colls.find((k) => k.id === id);
   co.cfg = co.cfg || { loginId: '', header: 'Authorization', prefix: 'Bearer ' };
@@ -523,26 +695,6 @@ function openCollCfg(id) {
     persist(); renderSide();
   });
 }
-async function runCollection(id) {
-  const co = S.colls.find((k) => k.id === id);
-  if (!co.items.length) return alert('集合是空的');
-  const lid = co.cfg && co.cfg.loginId;
-  const order = [...(lid ? co.items.filter((i) => i.id === lid) : []), ...co.items.filter((i) => i.id !== lid)];
-  dlg(`<h3 style="margin-top:0">執行：${esc(co.name)}</h3><div id="runlog"></div><div class="row" style="margin-top:12px;justify-content:flex-end"><button value="close" class="pri">關閉</button></div>`, () => { persist(); renderEnv(); });
-  const log = $('#runlog'); let failed = false;
-  for (const it of order) {
-    const line = document.createElement('div'); line.className = 'sr'; line.style.padding = '4px 0';
-    line.innerHTML = `<span class="hint">⏳</span><span class="mt ${it.method}">${it.method}</span><span>${esc(it.name || it.url)}</span>`; log.appendChild(line);
-    const tmp = JSON.parse(JSON.stringify(it)); tmp.collId = co.id;
-    const res = await execute(tmp);
-    const ok = !res.error && res.status < 400 && !(res.missing || []).length;
-    line.innerHTML = `<span>${ok ? '✅' : '❌'}</span><span class="mt ${it.method}">${it.method}</span><span style="flex:1">${esc(it.name || it.url)}</span>` +
-      (res.error ? `<span style="color:var(--bad)">${esc(res.error)}</span>` : `<span class="pill s${String(res.status)[0]}">${res.status}</span><span class="hint">${res.timeMs} ms</span>`) + badges(res);
-    if (!ok) { failed = true; break; }
-  }
-  const end = document.createElement('div'); end.className = 'hint'; end.style.marginTop = '8px';
-  end.textContent = failed ? '已中止：有步驟失敗' : '全部完成'; log.appendChild(end);
-}
 /* ---------- 儲存 ---------- */
 $('#save').onclick = () => {
   const t = cur(); if (!t) return;
@@ -556,19 +708,47 @@ $('#save').onclick = () => {
 function dlg(html, cb) { const d = $('#dlg'); $('#dform').innerHTML = html; d.onclose = () => cb(d.returnValue); d.showModal(); }
 
 /* ---------- 環境 ---------- */
-function renderEnv() { if (S.side === 'vars') setTimeout(renderSide); $('#envsel').innerHTML = `<option value="">（無環境）</option>` + S.envs.map((e) => `<option value="${e.id}" ${e.id === S.env ? 'selected' : ''}>${esc(e.name)}</option>`).join('') + '<option value="__new">＋ 新增環境…</option>'; }
-$('#envsel').onchange = (e) => { if (e.target.value === '__new') { const n = prompt('環境名稱（如 dev / stg）'); if (n) { const env = { id: uid(), name: n, vars: [{ on: true, k: 'baseUrl', v: '' }] }; S.envs.push(env); S.env = env.id; } } else S.env = e.target.value; persist(); renderEnv(); };
-$('#envedit').onclick = () => {
-  const env = S.envs.find((e) => e.id === S.env); if (!env) return alert('請先選擇或新增環境');
-  const rows = () => env.vars.map((p, i) => `<div class="kv" style="grid-template-columns:22px 1fr 1.6fr 40px 24px"><input type="checkbox" data-i="${i}" data-f="on" ${p.on !== false ? 'checked' : ''}><input data-i="${i}" data-f="k" value="${esc(p.k)}" placeholder="變數名"><input data-i="${i}" data-f="v" type="${p.secret ? 'password' : 'text'}" autocomplete="off" value="${esc(p.v)}" placeholder="值"><label title="機密：輸入遮罩、匯出時不帶出值"><input type="checkbox" data-i="${i}" data-f="secret" ${p.secret ? 'checked' : ''} style="width:auto">🔒</label><button type="button" class="ghost" data-x="${i}">✕</button></div>`).join('');
-  dlg(`<h3 style="margin-top:0">環境：${esc(env.name)}</h3><p class="hint">在 URL / Header / Body 用 <code>{{變數名}}</code> 引用。資料只存在這個瀏覽器。勾 🔒 的是機密（密碼、token）。</p><div id="vrows">${rows()}</div><button type="button" id="vadd">＋ 新增變數</button><div class="row" style="margin-top:12px;justify-content:space-between"><button type="button" id="vdel" class="ghost">刪除此環境</button><button class="pri" value="ok">完成</button></div>`, () => { persist(); renderEnv(); });
+function renderEnv() { if (S.side === 'vars' || S.side === 'coll') setTimeout(renderSide); refreshVarList(); }
+// 集合旁的 🌐：選擇這個集合用哪個環境，或新增一個
+function openEnvMenu(btn) {
+  const cid = btn.dataset.envpick, co = S.colls.find((k) => k.id === cid); if (!co) return;
+  const m = $('#vmenu');
+  m.innerHTML = S.envs.map((e) => `<div class="vm" data-envset="${cid}|${e.id}"><b>${e.id === co.env ? '✓ ' : ''}${esc(e.name)}</b><span class="hint">${e.vars.filter((v) => v.k).length} 個變數${S.colls.filter((c) => c.env === e.id && c.id !== cid).length ? ' · 也用於 ' + S.colls.filter((c) => c.env === e.id && c.id !== cid).map((c) => esc(c.name)).join('、') : ''}</span></div>`).join('')
+    + `<div class="vm" data-envnew="${cid}"><b>＋ 新增環境…</b></div>` + (co.env ? `<div class="vm" data-envset="${cid}|"><span class="hint">不使用環境</span></div>` : '');
+  const r = btn.getBoundingClientRect(); m.style.top = Math.min(r.bottom + 4, innerHeight - 120) + 'px'; m.style.left = Math.max(8, Math.min(r.left, innerWidth - 330)) + 'px'; m.hidden = false;
+}
+function setCollEnv(cid, eid) { const co = S.colls.find((k) => k.id === cid); if (!co) return; co.env = eid || undefined; persist(); renderSide(); refreshVarList(); renderReq(); }
+function openEnvEditor(envId) {
+  const env = S.envs.find((e) => e.id === envId); if (!env) return alert('這個集合還沒有環境，請先按 🌐 選擇或新增');
+  const rows = () => env.vars.map((p, i) => `<div class="kv" style="grid-template-columns:22px 1fr 1.6fr 40px 24px"><input type="checkbox" data-i="${i}" data-f="on" ${p.on !== false ? 'checked' : ''}><input data-i="${i}" data-f="k" value="${esc(p.k)}" placeholder="變數名"><input data-i="${i}" data-f="v" type="${isSecret(p) ? 'password' : 'text'}" autocomplete="off" value="${esc(p.v)}" placeholder="值"><label title="機密：輸入遮罩、匯出時不帶出值"><input type="checkbox" data-i="${i}" data-f="secret" ${p.secret ? 'checked' : ''} style="width:auto">🔒</label><button type="button" class="ghost" data-x="${i}">✕</button></div>`).join('');
+  const users = S.colls.filter((c) => c.env === env.id).map((c) => esc(c.name)).join('、');
+  dlg(`<h3 style="margin-top:0">環境：<input id="envname" value="${esc(env.name)}" style="width:200px;font-weight:600"></h3><p class="hint">${users ? `用於集合：${users}。` : ''}在 URL / Header / Body 用 <code>{{變數名}}</code> 引用。只存在本機 test-data/environments.json。勾 🔒 的是機密（密碼、token）。</p><div id="vrows">${rows()}</div><button type="button" id="vadd">＋ 新增變數</button><div class="row" style="margin-top:12px;justify-content:space-between"><button type="button" id="vdel" class="ghost">刪除此環境</button><span style="flex:1"></span><button type="button" id="vdup" title="完整複製一份成新環境（含機密值），複製後可改名">⧉ 複製成新環境</button><button type="button" id="vcopy" title="把變數複製成 JSON；機密值不會被複製">📋 複製到剪貼簿</button><button class="pri" value="ok">完成</button></div>`, () => { const n = $('#envname') && $('#envname').value.trim(); if (n) env.name = n; persist(); renderEnv(); });
   const box = $('#vrows');
   box.oninput = (e) => { const i = e.target.dataset.i; if (i == null) return; const f = e.target.dataset.f; env.vars[i][f] = (f === 'on' || f === 'secret') ? e.target.checked : e.target.value; };
   box.onchange = (e) => { if (e.target.dataset.f === 'secret') box.innerHTML = rows(); };
   box.onclick = (e) => { if (e.target.dataset.x != null) { env.vars.splice(+e.target.dataset.x, 1); box.innerHTML = rows(); } };
   $('#vadd').onclick = () => { env.vars.push({ on: true, k: '', v: '' }); box.innerHTML = rows(); };
-  $('#vdel').onclick = () => { if (confirm('刪除此環境？')) { S.envs = S.envs.filter((e) => e.id !== env.id); S.env = ''; $('#dlg').close(); persist(); renderEnv(); } };
-};
+  // ⧉ 複製成新環境：變數全部複製（含機密），Extract 的來源 / 時間不帶過去；名稱自動加「副本」避免重複
+  $('#vdup').onclick = () => {
+    const nameNow = ($('#envname').value || '').trim(); if (nameNow) env.name = nameNow;
+    let name = env.name + ' 副本', i = 2; while (S.envs.some((e) => e.name === name)) name = `${env.name} 副本 ${i++}`;
+    const copy = { id: uid(), name, vars: env.vars.map(({ src, at, ...v }) => ({ ...v })) };
+    S.envs.push(copy); persist(); $('#dlg').close();
+    setTimeout(() => openEnvEditor(copy.id), 0); // 打開新環境，直接可以改名
+  };
+  // 📋 複製到剪貼簿：JSON { 名稱, 變數 }；機密值留空
+  $('#vcopy').onclick = (ev) => {
+    const out = { name: ($('#envname').value || env.name).trim(), vars: Object.fromEntries(env.vars.filter((v) => v.k).map((v) => [v.k, isSecret(v) ? '' : String(v.v ?? '')])) };
+    const hidden = env.vars.filter((v) => v.k && isSecret(v)).length;
+    navigator.clipboard.writeText(JSON.stringify(out, null, 2)).then(() => { ev.target.textContent = hidden ? `已複製 ✓（${hidden} 個機密值未複製）` : '已複製 ✓'; setTimeout(() => (ev.target.textContent = '📋 複製到剪貼簿'), 2000); });
+  };
+  $('#vdel').onclick = () => {
+    if (!confirm('刪除此環境？（裡面的變數會一起刪除）')) return;
+    S.envs = S.envs.filter((e) => e.id !== env.id); if (S.env === env.id) S.env = '';
+    S.colls.forEach((c) => { if (c.env === env.id) c.env = undefined; });
+    $('#dlg').close(); persist(); renderEnv();
+  };
+}
 
 /* ---------- curl 匯入 / 匯出 ---------- */
 function shellSplit(s) {
@@ -702,15 +882,17 @@ function buildFiles() {
     let d = DIR_OF.get(c.id);
     if (!d || d.forName !== c.name) { d = { dir: uniqName(slug(c.name) || '未分組', usedDirs), forName: c.name }; DIR_OF.set(c.id, d); }
     const base = d.dir;
-    if (!(`${base}/_collection.json` in unparsed)) files[`${base}/_collection.json`] = JSON.stringify({ id: c.id, name: c.name, order: ci, cfg: c.cfg || undefined }, null, 2) + '\n';
     const used = new Set(['_collection.json']);
     Object.keys(unparsed).filter((p) => p.startsWith(base + '/')).forEach((p) => used.add(p.slice(base.length + 1).toLowerCase()));
     c.items.forEach((it) => { const f = FILE_OF.get(it.id); if (f && f.forName === it.name) used.add(f.file.toLowerCase()); });
-    c.items.forEach((it, ii) => {
+    const order = []; // 側欄的順序（拖曳 / 依名稱排序）存在 _collection.json，不寫進 curl 檔
+    c.items.forEach((it) => {
       let f = FILE_OF.get(it.id);
       if (!f || f.forName !== it.name) { f = { file: uniqName(reqFileBase(it), used, '.curl'), forName: it.name }; FILE_OF.set(it.id, f); }
-      files[`${base}/${f.file}`] = toCurlFile(it, { order: ii });
+      files[`${base}/${f.file}`] = toCurlFile(it);
+      order.push(f.file);
     });
+    if (!(`${base}/_collection.json` in unparsed)) files[`${base}/_collection.json`] = JSON.stringify({ id: c.id, name: c.name, order: ci, items: order, sort: c.sort || undefined, manual: c.sort ? c.manual : undefined, collapsed: c.collapsed || undefined, env: c.env || undefined, cfg: c.cfg || undefined }, null, 2) + '\n';
   });
   for (const h of S.hist) {
     const ts = new Date(h.at || 0).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
@@ -744,10 +926,11 @@ function fromFiles(files) {
   const colls = Object.values(dirs).map((c) => {
     const id = uniqueId(c.meta.id || hashId('c', c.dir)), name = c.meta.name || c.dir;
     DIR_OF.set(id, { dir: c.dir, forName: name });
-    const items = c.items.sort((a, b) => ord(a.order) - ord(b.order) || a.f.localeCompare(b.f)).map((x) => {
+    const pos = (f) => { const i = Array.isArray(c.meta.items) ? c.meta.items.indexOf(f) : -1; return i < 0 ? 1e9 : i; };
+    const items = c.items.sort((a, b) => pos(a.f) - pos(b.f) || ord(a.order) - ord(b.order) || a.f.localeCompare(b.f)).map((x) => {
       x.req.collId = id; FILE_OF.set(x.req.id, { file: x.f, forName: x.req.name }); return strip(x.req);
     });
-    return { id, name, cfg: c.meta.cfg, order: c.meta.order, items };
+    return { id, name, cfg: c.meta.cfg, order: c.meta.order, sort: c.meta.sort === 'asc' || c.meta.sort === 'desc' ? c.meta.sort : undefined, manual: Array.isArray(c.meta.manual) ? c.meta.manual : undefined, collapsed: c.meta.collapsed === true || undefined, env: c.meta.env || undefined, items };
   }).sort((a, b) => ord(a.order) - ord(b.order) || a.name.localeCompare(b.name));
   return { colls, hist: hist.sort((a, b) => b.at - a.at) };
 }
@@ -784,6 +967,7 @@ async function boot() {
   diskSnapshot = { ...(st.files || {}) };
   if (hasFiles) { const x = fromFiles(st.files); st.colls = x.colls; st.hist = x.hist; }
   if (!st.empty) apply(st);
+  if (S.env) S.colls.forEach((c) => { if (!c.env) c.env = S.env; }); // 舊資料：集合沿用原本全域選的環境
   // 上次開著的分頁若對應到磁碟上的請求、且沒有未存的修改，就以磁碟上最新內容為準（你在資料夾裡手動改過 curl 也會反映）
   const byId = new Map(S.colls.flatMap((c) => c.items.map((i) => [i.id, i])));
   S.tabs = S.tabs.map((t) => { const it = byId.get(t.id); return it && !t.dirty ? { ...blank(), ...JSON.parse(JSON.stringify(it)), res: null } : t; });
@@ -808,6 +992,7 @@ async function syncFromDisk() {
     if (dirty || sameFiles(files, diskSnapshot)) return; // 磁碟沒有變化就什麼都不做（不會清掉你的回應結果）
     const x = fromFiles(files);
     S.colls = x.colls; S.hist = x.hist; diskSnapshot = { ...files };
+    if (S.env) S.colls.forEach((c) => { if (!c.env) c.env = S.env; });
     // 開著的分頁：沒有未存修改、且磁碟上的內容和分頁不同，才換成磁碟上的最新內容
     const byId = new Map(S.colls.flatMap((c) => c.items.map((i) => [i.id, i])));
     S.tabs = S.tabs.map((t) => { const it = byId.get(t.id); return it && !t.dirty && toCurlFile(t) !== toCurlFile(it) ? { ...blank(), ...JSON.parse(JSON.stringify(it)), res: null } : t; });

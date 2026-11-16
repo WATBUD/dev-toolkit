@@ -200,11 +200,12 @@ async function handleProxy(req, res) {
       status: r.status, statusText: r.statusText, url: r.url, headers: hdrs, cookies,
       size: buf.length, timeMs: Date.now() - t0, ttfbMs: ttfb, isText,
       body: isText ? buf.toString("utf8") : buf.toString("base64"), contentType: ct,
+      sent: { method, url: url.toString(), headers }, // 實際送出的請求（含自動補上的 User-Agent），前端「請求」分頁顯示用
     });
   } catch (e) {
     const aborted = e && e.name === "AbortError";
     const cause = e && e.cause && (e.cause.code || e.cause.message);
-    send(res, 502, { error: aborted ? `逾時（${timeoutMs} ms）` : `${e.message}${cause ? " — " + cause : ""}`, timeMs: Date.now() - t0 });
+    send(res, 502, { error: aborted ? `逾時（${timeoutMs} ms）` : `${e.message}${cause ? " — " + cause : ""}`, timeMs: Date.now() - t0, sent: { method, url: url.toString(), headers } });
   } finally { clearTimeout(timer); }
 }
 

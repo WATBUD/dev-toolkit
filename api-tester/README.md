@@ -11,9 +11,8 @@ PORT=6000 npm start  # 換 port
 - 分頁式請求、Params / Headers / Body(JSON、Text、form) / Auth(Bearer、Basic)
 - 集合、歷史、環境變數 `{{var}}`（可標 🔒 機密：輸入遮罩、匯出不帶值）
 - **Extract**：請求送出後自動從回應 JSON 擷取欄位存成環境變數（如 `accessToken → token`）
-- **`{{$rsa(變數名)}}`**：送出時自動 GET 公鑰（環境變數 `rsaKeyUrl`）並以 RSA PKCS#1 v1.5 加密該變數，每次重新加密
+- **接著執行**：請求成功（且 Extract 都取到）後自動執行同集合的另一個請求，例如取 publicKey 的請求擷取 `data -> publicKey` 後接著執行 Login
 - **集合共用 Auth**：集合 ⚙ 設定登入請求與 token header；請求 Auth 選「集合共用」，收到 401 自動重登一次再重送
-- **Runner**：集合旁 ▶ 依序執行（登入先跑，擷取值傳給後續），任一步失敗即中止
 - 匯入 curl（支援 Chrome「Copy as cURL」）、複製成 curl、集合/環境匯出入 JSON
 - **資料存在本機 `test-data/` 資料夾**（已加入 `.gitignore`），不再依賴瀏覽器儲存，換 port / 換瀏覽器 / 清瀏覽器資料都不會遺失
 
@@ -25,10 +24,10 @@ PORT=6000 npm start  # 換 port
 test-data/
 ├── bo/                          ← 分組（= 介面裡的「集合」）
 │   ├── _collection.json         分組設定（登入請求、token 的 header 名稱…），唯一的 JSON 檔
-│   ├── GetRSAPublicKey.curl     一個請求一個檔
+│   ├── GetPublicKey.curl        一個請求一個檔
 │   └── Login.curl
 ├── _history/                    送出歷史（滾動保留最近 60 筆，也是 .curl）
-├── environments.json            環境變數（含 🔒 機密）  ← 最敏感
+├── environments.json            環境變數（含 🔒 機密）  ← 最敏感；每個集合在 _collection.json 指定用哪一個
 ├── session.json                 開著的分頁
 └── .trash/<時間>/…              被刪除的請求檔會先搬到這裡，不直接刪除
 ```
@@ -36,7 +35,7 @@ test-data/
 請求檔就是一段 curl，例如從 Chrome「Copy as cURL」直接存下來：
 
 ```bash
-curl -X GET 'http://host/api/AppService/GetRSAPublicKey' \
+curl -X GET 'http://host/api/AppService/GetPublicKey' \
   -H 'Accept: application/json, text/plain, */*' \
   -H 'Language: id'
 ```
@@ -44,14 +43,18 @@ curl -X GET 'http://host/api/AppService/GetRSAPublicKey' \
 curl 表達不了的資訊（全部選填）寫在檔案**開頭的註解**，對 bash 來說只是普通註解：
 
 ```bash
-# @name 取得公鑰
+# @name 登入
 # @extract accessToken -> token     回應 JSON 欄位 → 環境變數
 # @auth collection                  集合共用 token（或 bearer）
 # @bodytype json                    json | text | form | none
+# @next AdminInfo                   成功後接著執行同集合的請求
 curl -X POST '{{baseUrl}}/api/AppService/Login' ...
 ```
 
 - 沒有任何註解也可以；請求名稱省略時用檔名
+- **環境是每個集合各自的**：集合標題旁的 🌐 選擇 / 新增這個集合用的環境，✎ 編輯變數（編輯視窗可「⧉ 複製成新環境」或「📋 複製到剪貼簿」，後者不含機密值）；送出請求時用它所屬集合的環境，Extract 也存進那個環境
+- 點集合標題可**展開 / 收合**（狀態存在 `_collection.json`）
+- 側欄可**拖曳**調整請求順序，或按集合上的排序鈕：**A⇅** → A→Z（**A↓**）→ Z→A（**A↑**）→ 還原排序前的順序；順序存在 `<分組>/_collection.json`，不會改動 curl 檔
 - `{{變數}}` 會原樣保留；要實際執行請用介面上的「curl」按鈕複製已代入變數的版本
 - 位置可用 `DATA_DIR=/path npm start` 指定；資料夾權限 700、檔案 600
 - **只有「有未存變更」的檔案才會被寫入**：你手動編輯、介面沒動到的檔案不會被覆蓋
@@ -61,15 +64,12 @@ curl -X POST '{{baseUrl}}/api/AppService/Login' ...
 - 刪除請求一律先進 `.trash/`
 - 同時開兩個分頁會互相覆蓋（後存者勝），建議單一分頁操作
 
-## RSA 登入流程用法
-1. 在 `test-data/<分組>/` 放登入的 curl 檔（body 的密碼欄位寫 `{{$rsa(password)}}`，網址與帳號用 `{{baseUrl}}`、`{{account}}`…），再到右上環境「編輯」填入這些變數（`password` 勾 🔒）
-2. 送出「登入」：先 GET `rsaKeyUrl` 取公鑰 → 加密 `password` → 填入 `EncryptedPassword` → 擷取 `accessToken` 為 `{{token}}`
-3. 其他請求 Auth 選「集合共用」；token 的 header 名稱、前綴、是否同時寫 Cookie 在集合 ⚙ 設定（預設是 `Authorization` + `Bearer `；後台若用 `Access-Token` 就改 header 名稱並把前綴清空，需要同時帶 Cookie 就填 Cookie 名稱如 `authKey`）
+## 集合共用 token
+請求的 Auth 選「集合共用」，就會帶入環境變數 `{{token}}`；token 的 header 名稱、前綴、是否同時寫 Cookie 在集合 ⚙ 設定（預設是 `Authorization` + `Bearer `；後台若用 `Access-Token` 就改 header 名稱並把前綴清空，需要同時帶 Cookie 就填 Cookie 名稱如 `authKey`）。收到 401 會自動重跑集合設定的登入請求，再重送一次。
 
 ## 安全
 - 只綁 `127.0.0.1`
 - `/proxy` 會檢查 Host / Origin 並要求 `application/json`，避免其他網站透過你的瀏覽器濫用
-- 加密的明文只在本機 loopback 傳給 `/crypto/rsa`，不記 log
 - `test-data/` 內是**明文檔案**（含機密變數、token，以及請求 curl 裡可能寫的 Cookie / Authorization）：已被 `.gitignore` 排除，但請勿手動 `git add -f`、也別把資料夾放到雲端同步目錄
 - 機密變數用介面「匯出」時會清空值；但 Header / Body 裡的敏感值不會，分享前請先檢查
 
