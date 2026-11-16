@@ -67,6 +67,34 @@ curl -X POST '{{baseUrl}}/api/AppService/Login' ...
 ## 集合共用 token
 請求的 Auth 選「集合共用」，就會帶入環境變數 `{{token}}`；token 的 header 名稱、前綴、是否同時寫 Cookie 在集合 ⚙ 設定（預設是 `Authorization` + `Bearer `；後台若用 `Access-Token` 就改 header 名稱並把前綴清空，需要同時帶 Cookie 就填 Cookie 名稱如 `authKey`）。收到 401 會自動重跑集合設定的登入請求，再重送一次。
 
+## 開發
+
+```
+server.js            本機 server：靜態檔、/proxy 轉發、test-data/ 讀寫
+public/
+├── index.html       只有版面
+├── css/app.css
+└── js/              依 index.html 的順序以一般 <script> 載入、共用同一個全域範圍（順序有意義）
+    ├── state.js         小工具、狀態、存檔、變數代入
+    ├── request-build.js URL ⇄ Params、組裝請求
+    ├── send.js          送出、Extract、接著執行、自動重登、回應日誌
+    ├── ui-request.js    分頁列、請求區、變數選單
+    ├── ui-response.js   回應區、請求檢視
+    ├── ui-sidebar.js    側欄、拖曳排序、集合設定、儲存
+    ├── env.js           每個集合的環境
+    ├── curl.js          curl 解析、匯入 / 複製 curl
+    ├── files.js         .curl 檔 ⇄ 集合 / 歷史
+    └── main.js          啟動、快捷鍵、切回瀏覽器時重新讀取
+test/core.test.js    單元測試（curl 解析、.curl 來回、資料夾讀寫、變數、Extract）
+```
+
+```bash
+npm test             # 零依賴，使用 Node 內建的 node --test
+```
+
+- 改了 `server.js` 要重啟 server 才會生效；只改 `public/` 底下的檔案重新整理頁面即可
+- 新增 js 檔時記得加到 `index.html`，並放在它用到的檔案之後
+
 ## 安全
 - 只綁 `127.0.0.1`
 - `/proxy` 會檢查 Host / Origin 並要求 `application/json`，避免其他網站透過你的瀏覽器濫用

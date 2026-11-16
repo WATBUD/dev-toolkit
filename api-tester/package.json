@@ -2,7 +2,7 @@
   "name": "api-tester",
   "version": "1.0.0",
   "description": "API 測試工具（零依賴，內建 CORS 繞過 proxy）",
-  "scripts": { "start": "node server.js" },
+  "scripts": { "start": "node server.js", "test": "node --test test/*.test.js" },
   "engines": { "node": ">=18" },
   "license": "ISC"
 }
